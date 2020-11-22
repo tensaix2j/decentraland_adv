@@ -41,7 +41,30 @@ export class MainClass {
 		this.userID = userID;
 		
 		log( Date(), "start", userID );
-		 
+		
+		// hide avatar
+		const hideAvatarsEntity = new Entity()
+		hideAvatarsEntity.addComponent(
+			new AvatarModifierArea(
+				{ 
+					area: { 
+						box: new Vector3(16, 4, 16) 
+					}, 
+					modifiers: [AvatarModifiers.HIDE_AVATARS] 
+				}
+			)
+		);
+		hideAvatarsEntity.addComponent(
+			new Transform(
+				{ 
+					position: new Vector3(8, 0, 8) 
+				}
+			)
+		);
+		engine.addEntity(hideAvatarsEntity)
+
+
+
 		const camera = Camera.instance;
         let stage = new Txstage( 
             "stage", 

@@ -65,6 +65,8 @@ export class Txstage extends Entity {
 	public movablefloor ;
 	public conversing = false;
 
+	public shared_billboard = new Billboard();
+
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -119,24 +121,8 @@ export class Txstage extends Entity {
 		this.create_floors();
 		this.create_renderable();
 		this.create_npcs();
-
+		this.create_players();
 		
-
-		let player = new Entity();
-		player.setParent( this );
-		player.addComponent( new BoxShape() );
-		player.getComponent( BoxShape ).withCollisions = false;
-
-
-		player.addComponent( new Transform( {
-			position: new Vector3(0,   0.5, 0),
-			scale:    new Vector3(0.2, 0.3, 0.2)
-		}));
-		player.addComponent( tilemat2 );
-		this.player = player;
-		
-
-
 
 
 
@@ -190,6 +176,16 @@ export class Txstage extends Entity {
 
 	    	this.player_pos.x += delta_x;
 	    	this.player_pos.z += delta_z;
+
+	    	this.player.getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+
+	    	this.player.getComponent(Animator).getClip("_idle").playing = false;
+	    	this.player.getComponent(Animator).getClip("Walking").playing = true;
+	    } else {
+
+	    	this.player.getComponent(Animator).getClip("_idle").playing = true;
+	    	this.player.getComponent(Animator).getClip("Walking").playing = false;
+
 	    }
 
 	    this.vircam.x = this.player_pos.x ;
@@ -250,8 +246,8 @@ export class Txstage extends Entity {
 		}
 
 		for ( i = 0 ; i < this.render_npcs.length ; i++ ) {
-			let npc_tilex =  this.render_npcs[i]["virtualPosition"].x ;
-			let npc_tilez =  this.render_npcs[i]["virtualPosition"].z ;
+			let npc_tilex =  ( this.render_npcs[i]["virtualPosition"].x / this.tilesize ) >> 0;
+			let npc_tilez =  ( this.render_npcs[i]["virtualPosition"].z / this.tilesize ) >> 0;
 			if ( 
 						(npc_tilex >= this.vircam_tile.x - half_xtilecnt)  && 
 					 	(npc_tilex <= this.vircam_tile.x + half_xtilecnt)  &&
@@ -260,9 +256,9 @@ export class Txstage extends Entity {
 			) { 
 
 
-				this.render_npcs[i].getComponent(Transform).position.x = npc_tilex * this.tilesize - this.vircam.x;
-				this.render_npcs[i].getComponent(Transform).position.z = npc_tilez * this.tilesize - this.vircam.z;
-				this.render_npcs[i].getComponent(Transform).position.y = 0.5;
+				this.render_npcs[i].getComponent(Transform).position.x = this.render_npcs[i]["virtualPosition"].x - this.vircam.x;
+				this.render_npcs[i].getComponent(Transform).position.z = this.render_npcs[i]["virtualPosition"].z - this.vircam.z;
+				this.render_npcs[i].getComponent(Transform).position.y = this.render_npcs[i]["virtualPosition"].y;
 				
 			} else {
 				this.render_npcs[i].getComponent(Transform).position.y = -999;
@@ -450,6 +446,8 @@ export class Txstage extends Entity {
 						this.player_target.z = this.map_max.z * this.tilesize;
 					}	
 
+
+
 					//log( this.player_target.x , this.player_target.z );
 
 				} 
@@ -584,6 +582,8 @@ export class Txstage extends Entity {
 				scale   : new Vector3(1,1,1)
 			}) );
 			tree.addComponent( resources.models.tree );
+			tree.getComponent( GLTFShape ).withCollisions = false;
+			
 			this.render_trees.push( tree );
 		}
 
@@ -612,6 +612,8 @@ export class Txstage extends Entity {
 				scale   : new Vector3(this.tilesize, this.tilesize , this.tilesize )
 			}) );
 			house.addComponent( resources.models.house );
+			house.getComponent( GLTFShape ).withCollisions = false;
+		
 			this.render_houses.push( house );
 		}
 
@@ -621,15 +623,15 @@ export class Txstage extends Entity {
 
     	let _this = this;
 
-    	let ILoveCats: Dialog[] = [
+    	let welcomeDialog: Dialog[] = [
     		{
-    			text: 'Greeting Traveller'
+    			text: 'Greeting Traveller, Welcome to Mini Rogue'
     		},
     		{
-    			text: 'This is a mini-world within the virtual world'
+    			text: 'To walk around, click on the ground. Your in-game character will walk to the destination.'
     		},
     		{
-    			text: 'Everything fits inside a single parcel.'
+    			text: 'To attack, click on the target. To cast spell (If you have learn use E on the target.)'
     		},
     		{
     			text: 'To the south is where the town is located, to the north is the entrance to the Dungeon.'
@@ -652,11 +654,13 @@ export class Txstage extends Entity {
 		    () => {
 		    	// On activate 
 		    	_this.conversing = true;
-		    			
-		    	myNPC.talk(ILoveCats, 0);
+		    	_this.player_target.x = _this.player_pos.x;
+		    	_this.player_target.z = _this.player_pos.z;
+
+		    	myNPC.talk(welcomeDialog, 0);
 		    },
 		    {
-				idleAnim: `Weight_Shift`,
+				idleAnim: 'Walking',
 				portrait: { path: 'models/knight_ui.png', offsetX: 40, height: 128, width: 128  },
 			    coolDownDuration: 3,
 			    hoverText: 'CHAT',
@@ -668,14 +672,100 @@ export class Txstage extends Entity {
 			}
 		)
 		myNPC.getComponent(Transform).rotation.eulerAngles = new Vector3(0, -180, 0 );
+		myNPC.getComponent( GLTFShape ).withCollisions = false;
+
 		myNPC.setParent(this);
-		myNPC["virtualPosition"] = new Vector3(0,0,1);
+		myNPC["virtualPosition"] = new Vector3(0,  0.5 , 1 * this.tilesize);
+
 
 		this.render_npcs.push( myNPC );
+
+
+
+
+		let weaponStoreDialog: Dialog[] = [
+    		{
+				text: 'Wanna Buy Some Weapon?',
+				isEndOfDialog: true,
+				triggeredByNext: () => {
+			    	_this.conversing = false;
+			    }
+			},
+		]
+
+
+		let myNPC2 = new NPC(
+		    { 
+		    	position: new Vector3( 0, -999, 0),
+		    	scale: new Vector3(0.15,0.15,0.15)
+		    }, 
+		    'models/giant.glb', 
+		    () => {
+		    	// On activate 
+		    	_this.conversing = true;
+		    	myNPC2.talk(weaponStoreDialog, 0);
+		    },
+		    {
+				idleAnim: 'Walking',
+				portrait: { path: 'models/giant_ui.png', offsetX: 40, height: 128, width: 128  },
+			    coolDownDuration: 3,
+			    hoverText: 'CHAT',
+			    onlyClickTrigger: true,
+			    continueOnWalkAway: true,
+			    onWalkAway: () => {
+				
+				},
+			}
+		)
+		myNPC2.getComponent(Transform).rotation.eulerAngles = new Vector3(0, 90, 0 );
+		myNPC2.getComponent( GLTFShape ).withCollisions = false;
+		
+		myNPC2.setParent(this);
+		myNPC2["virtualPosition"] = new Vector3(-3 * this.tilesize , 0.6   , -11 * this.tilesize );
+
+		this.render_npcs.push( myNPC2 );
+
 
     }
 
 
+
+    //----
+    create_players() {
+
+
+		let player = new Entity();
+		player.setParent( this );
+		player.addComponent( resources.models.warrior );
+		player.getComponent( GLTFShape ).withCollisions = false;
+		player.addComponent( new Transform( {
+			position: new Vector3(0,   0.5, 0),
+			scale:    new Vector3(0.15, 0.15, 0.15)
+		}));
+		player.addComponent( new Animator );
+		player.getComponent(Animator).addClip( new AnimationState("_idle") );
+		player.getComponent(Animator).addClip( new AnimationState("Walking") );
+		player.getComponent(Animator).addClip( new AnimationState("Punch") );
+		player.getComponent(Animator).addClip( new AnimationState("Die") );
+   			
+		let clip = player.getComponent(Animator).getClip("_idle");
+		clip.playing = true;
+
+		let playername = new Entity();
+		playername.setParent( player );
+		playername.addComponent( new TextShape(this.userID) ) ;
+		playername.addComponent( new Transform( {
+			position: new Vector3(0, 2.5, 0),
+			scale:  new Vector3( 0.5, 0.5, 0.5)
+		}));
+		playername.addComponent( this.shared_billboard );
+
+
+		this.player = player;
+		
+
+
+    }
 
 
 
