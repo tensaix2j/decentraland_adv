@@ -36,10 +36,7 @@ export class Txstage extends Entity {
 
 
 	
-	public player;
-
-
-	public player_target  	= new Vector3(0,0,0);
+	
 	public vircam  			= new Vector3(0,0,0);
 	public vircam_tile 		= new Vector3(0,0,0);
 
@@ -64,6 +61,8 @@ export class Txstage extends Entity {
 	public render_surfaces 	= [];
 	public render_npcs 		= [];
 	public render_monsters 	= [];
+	public render_players 	= [];
+
 
 
 	public objectmaps = {};
@@ -71,8 +70,11 @@ export class Txstage extends Entity {
 	// Monster map held by b2d 
 
 
+	public playerb2d;
+	
 
-	public tilemats = [];
+
+	public sharedmats = [];
 	public movablefloor ;
 	public conversing = false;
 
@@ -80,10 +82,12 @@ export class Txstage extends Entity {
 	public shared_planeshape = new PlaneShape();
 
 	public world;
-	public playerb2d;
 	public box2daabb;
 	public box2dcallback; 
 	public monsters_in_range = [];
+
+	public sounds = {};
+
 
 
 	constructor( id, userID , transform_args , camera ) {
@@ -102,13 +106,16 @@ export class Txstage extends Entity {
 		this.create_borders();
 		this.create_floors();
 		this.create_npcs();
-		this.create_players();
+		this.create_new_player_entity();
 		this.prepare_inputs();
 
 		
         this.perlin = new Perlin();
         this.init_maps();
         this.render_map();
+        this.init_sound();
+
+
 
 	}
 
@@ -117,49 +124,138 @@ export class Txstage extends Entity {
 		
 		this.world.Step( 0.05  , 10, 10 );
 
-		let diffx = this.player_target.x - this.playerb2d.GetPosition().x;
-		let diffz = this.player_target.z - this.playerb2d.GetPosition().y;
-		let speed = 20;
+		// p , , , , attacking, target_xy, target_mon, 
 
-		let halftilesize = this.tilesize / 2;
+		if ( this.playerb2d.m_userData[4] > 0 ) {
+
+			this.playerb2d.m_userData[4] -= 1;
+			this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Punch");
+			
+			if ( this.playerb2d.m_userData[4] == 10 ) {
+
+				let monb2d = this.playerb2d.m_userData[6];
+				
+				if ( this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.9 ) == 1 ) {
+					this.sounds["swordhit"].playOnce();
+					this.monster_gethit( monb2d , this.playerb2d );
+				}
+			}
+			    	
+
+		} else {
+
+			let diffx = this.playerb2d.m_userData[5].x - this.playerb2d.GetPosition().x;
+			let diffz = this.playerb2d.m_userData[5].z - this.playerb2d.GetPosition().y;
+			let speed = 0.8;
+
+			let halftilesize = this.tilesize / 2;
+			
+			if ( diffx * diffx + diffz * diffz >= 0.15 * 0.15 ) {
+
+				let rad	 = Math.atan2( diffx, diffz );
+		    	let deg  = rad * 180.0 / Math.PI ;
+
+		    	let delta_x = speed  * Math.sin(rad);
+		    	let delta_z = speed  * Math.cos(rad);
+
+		    	this.playerb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
+
+
+		    	this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+		    	this.playClip( this.render_players[ 0 ].getComponent(Animator) , "Walking");
+		    
+		    } else {
+		    	this.playClip( this.render_players[ 0 ].getComponent(Animator) , "_idle");
+		    	this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
+
+		    }
 		
-		if ( diffx * diffx + diffz * diffz >= 0.15 * 0.15 ) {
-
-			let rad	 = Math.atan2( diffx, diffz );
-	    	let deg  = rad * 180.0 / Math.PI ;
-
-	    	let delta_x = speed * dt * Math.sin(rad);
-	    	let delta_z = speed * dt * Math.cos(rad);
-
-	    	this.playerb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
-
-
-	    	this.player.getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
-
-	    	this.player.getComponent(Animator).getClip("_idle").playing = false;
-	    	this.player.getComponent(Animator).getClip("Walking").playing = true;
-	    } else {
-
-	    	this.player.getComponent(Animator).getClip("_idle").playing = true;
-	    	this.player.getComponent(Animator).getClip("Walking").playing = false;
-	    	this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
-
-	    }
+		}
 
 	    this.vircam.x = this.playerb2d.GetPosition().x;
 		this.vircam.z = this.playerb2d.GetPosition().y;
 		
 		this.render_map();
 		
-	    
+	}
+
+	//--------
+	monster_gethit( monb2d , playerb2d ) {
+
+		let rendermon_i = monb2d.m_userData[3];
+		
+		monb2d.m_userData[8] -= playerb2d.m_userData[7];
+		
+		if ( monb2d.m_userData[8] <= 0 ) {
+			monb2d.m_userData[8] = 0;
+			monb2d.m_userData[10] = 80;
+			this.render_monsters[ rendermon_i ].removeComponent( OnPointerDown );
+		}
+		this.render_monsters[ rendermon_i ]["healthbar"].getComponent(Transform).scale.x = monb2d.m_userData[8] * 1.5 / monb2d.m_userData[9] ;
 
 	}
+
+
+
+
+	//--------
+	is_within_distance( targetb2d , subjectb2d , range ) {
+
+		let diffx = targetb2d.GetPosition().x - subjectb2d.GetPosition().x  ;
+		let diffz = targetb2d.GetPosition().y - subjectb2d.GetPosition().y  ;
+		let distsqr = diffx * diffx + diffz * diffz;
+
+		if ( distsqr <= range * range ) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}	
+
+
+
+	//-------------------
+	monster_onclick( rendermon_i ) {
+		
+		//log( monster_onclick );
+
+		let monb2d = this.render_monsters[rendermon_i]["used_by"];
+		if ( monb2d != null ) {
+
+			//log("monb2d not null");
+			if ( this.playerb2d.m_userData[4] == 0 ) {
+				
+				//log( "distsqr" ,distsqr );
+		    	// p,   ,   ,  , attacking
+		    	if ( this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
+
+		    		//log("Hitting ", rendermon_i );
+			    	this.playerb2d.m_userData[4] = 20;
+			    	this.playerb2d.m_userData[6] = monb2d;
+
+			    	let diffx = monb2d.GetPosition().x - this.playerb2d.GetPosition().x  ;
+					let diffz = monb2d.GetPosition().y - this.playerb2d.GetPosition().y  ;
+
+			    	let rad	 = Math.atan2( diffx, diffz );
+			    	let deg  = rad * 180.0 / Math.PI ;
+			    	this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
+			    	this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+			    	
+			    	
+			    }		
+			}
+		}
+			
+	}
+
 
 	//-------
 	playClip( animator , clipname ) {
 
 		animator.getClip("Punch").playing 		= false;
 		animator.getClip("Die").playing 		= false;
+		animator.getClip("Die").looping 		= false
+
 		animator.getClip("_idle").playing 		= false;
 		animator.getClip("Walking").playing 	= false;
 		animator.getClip(clipname).playing 		= true;
@@ -177,11 +273,31 @@ export class Txstage extends Entity {
     	let speed = 0.6;
     	let distsqr = diffx * diffx + diffz * diffz;
 
-    	// m,  type ,   reg,   rendermon_i, attacking
-    	if ( monb2d.m_userData[4] > 0 ) {
+    	// m,  type ,   reg,   rendermon_i, attacking, , , ,dmg,hp,maxhp, dying
+    	
+
+    	if ( monb2d.m_userData[10] > 0 ) {
+
+			this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Die");
+			if ( monb2d.m_userData[4] == 10 ) {
+				if ( monb2d.m_userData[1] == 2 ) {
+    				this.sounds["skeletonhit"].playOnce();
+    			}
+    		}    		
+    		if ( monb2d.m_userData[10] > 1 ) {
+    			monb2d.m_userData[10] -= 1;
+    		} else {
+    			this.world.DestroyBody( monb2d );
+    		}
+
+
+    	} else if ( monb2d.m_userData[4] > 0 ) {
 
     		monb2d.m_userData[4] -= 1;
     		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Punch");
+    		if ( monb2d.m_userData[4] == 10 ) {
+    			this.sounds["punch"].playOnce();
+    		}
 
     	} else {
 
@@ -230,6 +346,7 @@ export class Txstage extends Entity {
 	}
 
 
+
 	//-----------
 	render_map() {
 		
@@ -243,9 +360,9 @@ export class Txstage extends Entity {
 		
 
 		// Player
-		this.player.getComponent(Transform).position.y = 0.5 ; 
-		this.player.getComponent(Transform).position.x = this.playerb2d.GetPosition().x - this.vircam.x; 
-		this.player.getComponent(Transform).position.z = this.playerb2d.GetPosition().y - this.vircam.z; 
+		this.render_players[0].getComponent(Transform).position.y = 0.5 ; 
+		this.render_players[0].getComponent(Transform).position.x = this.playerb2d.GetPosition().x - this.vircam.x; 
+		this.render_players[0].getComponent(Transform).position.z = this.playerb2d.GetPosition().y - this.vircam.z; 
 		
 		// Floor 
 		this.movablefloor.getComponent( Transform ).position.x = -this.vircam.x % this.tilesize;
@@ -315,21 +432,19 @@ export class Txstage extends Entity {
 					( mon_z > this.vircam.z + half_ztilecnt * this.tilesize ) 
 				) {
 
-
-					//log("xbound " ,mon_x, this.vircam.x - half_xtilecnt * this.tilesize,this.vircam.x + half_xtilecnt * this.tilesize);
-					log("zbound " ,mon_z, this.vircam.z - half_ztilecnt * this.tilesize,this.vircam.z + half_ztilecnt * this.tilesize);
-					log("monster removed: id", i  , );
-
 					monb2d.m_userData[2] = 0;
 					//this.render_monsters[ i ].getComponent(Transform).position.y = -999; 
 					engine.removeEntity( this.render_monsters[ i ] );
 				 	this.render_monsters[ i ]["used_by"] = null;
+					
 				}
 			}   
 		}
 
 		
 		this.find_monster_within_window();
+
+
 		for ( i = 0 ; i < this.monsters_in_range.length ; i++ ) {
 			
 			let monb2d = this.monsters_in_range[i];
@@ -362,11 +477,17 @@ export class Txstage extends Entity {
 
 				let rendermon_i = monb2d.m_userData[3];
 				
-				this.update_monster( monb2d , rendermon_i );
+				
 				this.render_monsters[ rendermon_i ].getComponent(Transform).position.x = monb2d.GetPosition().x - this.vircam.x; 
 				this.render_monsters[ rendermon_i ].getComponent(Transform).position.z = monb2d.GetPosition().y - this.vircam.z; 
-				this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 ; 
 
+				if ( monb2d.m_userData[10] > 0 && monb2d.m_userData[10] < 20 ) {
+					this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 * monb2d.m_userData[10] / 20; 
+				} else {
+					this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 ; 
+				}
+
+				this.update_monster( monb2d , rendermon_i );
 			} 
 			
 		}
@@ -530,6 +651,11 @@ export class Txstage extends Entity {
 			if ( e.hit ) {
 
 				let hitEntity = engine.entities[e.hit.entityId];
+
+				//if ( engine.entities[e.hit.entityId].hasComponent(OnPointerDown)) {
+    			//	return ;
+    			//}
+
 				if ( typeof hitEntity != "undefined"   ) {
 					
 					if ( this.conversing ) {
@@ -540,25 +666,25 @@ export class Txstage extends Entity {
 
 					
 					//log( e.hit.hitPoint.x - transform.position.x , e.hit.hitPoint.z - transform.position.z );
-					this.player_target.x = e.hit.hitPoint.x - transform.position.x + this.vircam.x ;
-					this.player_target.z = e.hit.hitPoint.z - transform.position.z + this.vircam.z ;
+					this.playerb2d.m_userData[5].x = e.hit.hitPoint.x - transform.position.x + this.vircam.x ;
+					this.playerb2d.m_userData[5].z = e.hit.hitPoint.z - transform.position.z + this.vircam.z ;
 
-					if ( this.player_target.x < this.map_min.x * this.tilesize  ) {
-						this.player_target.x = this.map_min.x * this.tilesize;
+					if ( this.playerb2d.m_userData[5].x < this.map_min.x * this.tilesize  ) {
+						this.playerb2d.m_userData[5].x = this.map_min.x * this.tilesize;
 					}
-					if ( this.player_target.x > this.map_max.x * this.tilesize) {	
-						this.player_target.x = this.map_max.x * this.tilesize;
+					if ( this.playerb2d.m_userData[5].x > this.map_max.x * this.tilesize) {	
+						this.playerb2d.m_userData[5].x = this.map_max.x * this.tilesize;
 					}
-					if ( this.player_target.z < this.map_min.z * this.tilesize) {
-						this.player_target.z = this.map_min.z * this.tilesize;
+					if ( this.playerb2d.m_userData[5].z < this.map_min.z * this.tilesize) {
+						this.playerb2d.m_userData[5].z = this.map_min.z * this.tilesize;
 					}
-					if ( this.player_target.z > this.map_max.z * this.tilesize) {	
-						this.player_target.z = this.map_max.z * this.tilesize;
+					if ( this.playerb2d.m_userData[5].z > this.map_max.z * this.tilesize) {	
+						this.playerb2d.m_userData[5].z = this.map_max.z * this.tilesize;
 					}	
 
 
 
-					//log( this.player_target.x , this.player_target.z );
+					
 
 				} 
 			}
@@ -583,8 +709,18 @@ export class Txstage extends Entity {
 		surfacepatch.getComponent(Transform).rotation.eulerAngles = new Vector3(90,0,-90);
 		surfacepatch.addComponent( new PlaneShape() );
 		surfacepatch.getComponent( PlaneShape ).withCollisions = false;
+		surfacepatch.getComponent( PlaneShape ).uvs = [
+			0,0.125,
+			0,0.125,
+			0.125,0.125,
+			0.125,0,
+			0,0.125,
+			0,0.125,
+			0.125,0.125,
+			0.125,0
+		];
 		
-		surfacepatch.addComponent( this.tilemats[4] );
+		surfacepatch.addComponent( this.sharedmats[4] );
 		this.render_surfaces.push( surfacepatch );
 
 		return this.render_surfaces.length - 1;
@@ -613,6 +749,7 @@ export class Txstage extends Entity {
     create_new_monster_entity() {
 
     	let monster = new Entity();
+    	let monid 	= this.render_monsters.length;
 		monster.setParent( this );
 		monster.addComponent( new Transform({
 			position: new Vector3(0, -999,  0),
@@ -622,13 +759,86 @@ export class Txstage extends Entity {
 		monster.getComponent( GLTFShape ).withCollisions = false;
 		monster["model"] = 2;
 		monster.addComponent( new Animator );
+		monster.addComponent( new OnPointerDown(
+				(e) => {
+					this.monster_onclick( monid ); 
+				},{
+					hoverText: "Attack"
+				}
+			)
+		);
+
 		this.addClips( monster.getComponent(Animator ) );
 		
-		this.render_monsters.push( monster );
 
+		let healthbar = new Entity();
+        healthbar.setParent( monster );
+		healthbar.addComponent( this.shared_planeshape );
+		healthbar.addComponent( new Transform({
+			position: new Vector3(  0,   4,   0),
+			scale   : new Vector3( 1.5,   0.2,   1)
+		}));
+		healthbar.addComponent( this.shared_billboard );
+		healthbar.addComponent( this.sharedmats[5] );
+		monster["healthbar"] = healthbar;
+
+
+		this.render_monsters.push( monster );
 		return this.render_monsters.length - 1;
 
     }
+
+
+
+     //----
+    create_new_player_entity() {
+
+		let player = new Entity();
+		player.setParent( this );
+		player.addComponent( resources.models.warrior );
+		player.getComponent( GLTFShape ).withCollisions = false;
+		player.addComponent( new Transform( {
+			position: new Vector3(0,   0.5, 0),
+			scale:    new Vector3(0.15, 0.15, 0.15)
+		}));
+		player.addComponent( new Animator );
+		this.addClips( player.getComponent(Animator ) );
+
+		let clip = player.getComponent(Animator).getClip("_idle");
+		clip.playing = true;
+
+		let playername = new Entity();
+		playername.setParent( player );
+		playername.addComponent( new TextShape(this.userID) ) ;
+		playername.addComponent( new Transform( {
+			position: new Vector3(0, 2.5, 0),
+			scale:  new Vector3( 0.5, 0.5, 0.5)
+		}));
+		playername.addComponent( this.shared_billboard );
+
+		this.playerb2d = this.createDynamicCircle(  
+			0 ,  
+			0 ,  
+			this.tilesize / 4 , 
+			this.world, 
+			false 
+    	);
+		this.playerb2d.m_userData = ["p", 
+										0, 0,0,0, 
+										new Vector3(0,0,0),
+										0,
+										3,
+										 60,
+										 60];
+
+
+		
+		this.render_players.push( player );
+		return this.render_players.length - 1;
+
+
+    }
+
 
 
     //---
@@ -650,7 +860,7 @@ export class Txstage extends Entity {
     	let frameindex_x, frameindex_y;
 		let framesize_x, framesize_y;
 
-		if (  this.surfaces[ j + "," + i ][0] == 1 ) {
+		if (  this.surfaces[ j + "," + i ][0] == 1  || this.surfaces[ j + "," + i ][0] == 3 ) {
 			
 			let frameindex = 0;
 			if ( this.surfaces[ j + "," + (i+1) ] != null ) {
@@ -665,18 +875,25 @@ export class Txstage extends Entity {
 			if ( this.surfaces[ (j-1) + "," + (i) ] != null ) {
 				frameindex |= 8;
 			}
-
-			frameindex_x = frameindex % 4;
-			frameindex_y = (frameindex / 4 ) >> 0;
 			framesize_x  = 0.125;
 			framesize_y  = 0.125;
-		
+			
+			frameindex_x = (frameindex % 4) ;
+			frameindex_y = (frameindex / 4 ) >> 0;
+			
+			if ( this.surfaces[ j + "," + i ][0] == 3 ) {
+				frameindex_x = (frameindex % 4) + 4;
+			}
+
+
 		} else if (  this.surfaces[ j + "," + i ][0] == 2 ) {
-			frameindex_x = 0;
-			frameindex_y = 2;
+			
 			framesize_x  = 0.25;
 			framesize_y  = 0.25;
-		}
+			frameindex_x = 0;
+			frameindex_y = 2;
+			
+		} 
 
 		this.render_surfaces[ surface_i ].getComponent( PlaneShape ).uvs = [
 			frameindex_x * framesize_x 					, frameindex_y * framesize_y ,
@@ -701,12 +918,15 @@ export class Txstage extends Entity {
     		this.render_objects[ object_i ].removeComponent( GLTFShape );
     			
     		if ( this.objectmaps[ j + "," + i ][0] == 1 ) {
-    			// Tree
     			this.render_objects[ object_i ].addComponent( resources.models.tree );
     				
     		} else if ( this.objectmaps[ j + "," + i ][0] == 2 ) {
-    			// House
     			this.render_objects[ object_i ].addComponent( resources.models.house );
+    		
+    		} else if ( this.objectmaps[ j + "," + i ][0] == 3 ) {
+    			this.render_objects[ object_i ].addComponent( resources.models.tombstone );
+    			
+
     		}
     		this.render_objects[ object_i ]["model"] = this.objectmaps[ j + "," + i ][0];
     	} 
@@ -747,7 +967,7 @@ export class Txstage extends Entity {
 			position: new Vector3(0,0,0),
 			scale   : new Vector3( this.tilesize * this.xtilecnt , this.tilesize -0.01,   this.tilesize * this.ztilecnt )
 		}));
-		floor.addComponent( this.tilemats[1] );
+		floor.addComponent( this.sharedmats[1] );
 		
 		let movablefloor = new Entity();
 		movablefloor.setParent( this );
@@ -760,7 +980,7 @@ export class Txstage extends Entity {
 		}));
 		movablefloor.getComponent(Transform).rotation.eulerAngles = new Vector3(90,0,0);
 
-		movablefloor.addComponent( this.tilemats[2] );
+		movablefloor.addComponent( this.sharedmats[2] );
 			
 		this.movablefloor = movablefloor;
     }
@@ -794,7 +1014,7 @@ export class Txstage extends Entity {
 			position: new Vector3(0,  y , half_ztilecnt * this.tilesize ),
 			scale: new Vector3( this.tilesize * (this.xtilecnt + 1) , this.tilesize * 3.2 , this.tilesize * 2 )
 		}));
-		borderbox.addComponent( this.tilemats[1] );
+		borderbox.addComponent( this.sharedmats[1] );
 
 
 		borderbox = new Entity();
@@ -804,7 +1024,7 @@ export class Txstage extends Entity {
 			position: new Vector3(0, y, -half_ztilecnt * this.tilesize ),
 			scale: new Vector3( this.tilesize * (this.xtilecnt+1) , this.tilesize * 3.2 , this.tilesize * 2 )
 		}));
-		borderbox.addComponent( this.tilemats[1] );
+		borderbox.addComponent( this.sharedmats[1] );
 
 		borderbox = new Entity();
 		borderbox.setParent( this );
@@ -813,7 +1033,7 @@ export class Txstage extends Entity {
 			position: new Vector3( -half_xtilecnt * this.tilesize ,y, 0 ),
 			scale: new Vector3( this.tilesize * 2  , this.tilesize * 3.2 , this.tilesize * this.ztilecnt)
 		}));
-		borderbox.addComponent( this.tilemats[1] );
+		borderbox.addComponent( this.sharedmats[1] );
 
 		borderbox = new Entity();
 		borderbox.setParent( this );
@@ -822,7 +1042,7 @@ export class Txstage extends Entity {
 			position: new Vector3( half_xtilecnt * this.tilesize ,y, 0 ),
 			scale: new Vector3( this.tilesize * 2  , this.tilesize * 3.2 , this.tilesize * this.ztilecnt)
 		}));
-		borderbox.addComponent( this.tilemats[1] );
+		borderbox.addComponent( this.sharedmats[1] );
 		
     }
 
@@ -876,8 +1096,8 @@ export class Txstage extends Entity {
 		    () => {
 		    	// On activate 
 		    	_this.conversing = true;
-		    	_this.player_target.x = _this.playerb2d.GetPosition().x;
-		    	_this.player_target.z = _this.playerb2d.GetPosition().y;
+		    	_this.playerb2d.m_userData[5].x = _this.playerb2d.GetPosition().x;
+		    	_this.playerb2d.m_userData[5].z = _this.playerb2d.GetPosition().y;
 
 		    	myNPC.talk(welcomeDialog, 0);
 		    },
@@ -1065,78 +1285,50 @@ export class Txstage extends Entity {
    	}
 
 
-    //----
-    create_players() {
-
-
-		let player = new Entity();
-		player.setParent( this );
-		player.addComponent( resources.models.warrior );
-		player.getComponent( GLTFShape ).withCollisions = false;
-		player.addComponent( new Transform( {
-			position: new Vector3(0,   0.5, 0),
-			scale:    new Vector3(0.15, 0.15, 0.15)
-		}));
-		player.addComponent( new Animator );
-		this.addClips( player.getComponent(Animator ) );
-
-		let clip = player.getComponent(Animator).getClip("_idle");
-		clip.playing = true;
-
-		let playername = new Entity();
-		playername.setParent( player );
-		playername.addComponent( new TextShape(this.userID) ) ;
-		playername.addComponent( new Transform( {
-			position: new Vector3(0, 2.5, 0),
-			scale:  new Vector3( 0.5, 0.5, 0.5)
-		}));
-		playername.addComponent( this.shared_billboard );
-
-
-		this.player = player;
-		
-		this.playerb2d = this.createDynamicCircle(  
-			0 ,  
-			0 ,  
-			this.tilesize / 4 , 
-			this.world, 
-			false 
-    	);
-		
-
-
-    }
-
+   
 
     //---
     create_shared_materials() {
 
-		let tilemat = new Material();
-		tilemat.albedoColor = Color3.FromInts( 230, 255, 255);
-		this.tilemats.push( tilemat );
+		let sharedmat = new Material();
+		sharedmat.albedoColor = Color3.FromInts( 230, 255, 255);
+		this.sharedmats.push( sharedmat );
 
-		let tilemat2 = new Material();
-		tilemat2.albedoColor = Color3.FromInts(76,52,26);
-		this.tilemats.push( tilemat2 );
+		let sharedmat2 = new Material();
+		sharedmat2.albedoColor = Color3.FromInts(76,52,26);
+		this.sharedmats.push( sharedmat2 );
 		
-		let tilemat3 = new Material();
-		tilemat3.albedoTexture = resources.textures.floor;
-		tilemat3.specularIntensity = 0;
-		tilemat3.roughness = 1;
-		this.tilemats.push( tilemat3 );
+		let sharedmat3 = new Material();
+		sharedmat3.albedoTexture = resources.textures.floor;
+		sharedmat3.specularIntensity = 0;
+		sharedmat3.roughness = 1;
+		this.sharedmats.push( sharedmat3 );
 		
-		let tilemat4 = new Material();
-		tilemat4.albedoColor = Color3.FromInts(76,52,26);
-		tilemat4.specularIntensity = 0;
-		tilemat4.roughness = 1;
-		this.tilemats.push( tilemat4 );
+		let sharedmat4 = new Material();
+		sharedmat4.albedoColor = Color3.FromInts(76,52,26);
+		sharedmat4.specularIntensity = 0;
+		sharedmat4.roughness = 1;
+		this.sharedmats.push( sharedmat4 );
 
-		let tilemat5 = new Material();
-		tilemat5.albedoTexture = resources.textures.surfacepatch;
-		tilemat5.bumpTexture = resources.textures.surfacepatch;
-		tilemat5.specularIntensity = 0;
-		tilemat5.roughness = 1;
-		this.tilemats.push( tilemat5 );
+		let sharedmat5 = new Material();
+		sharedmat5.albedoTexture = resources.textures.surfacepatch;
+		sharedmat5.bumpTexture = resources.textures.surfacepatch;
+		sharedmat5.specularIntensity = 0;
+		sharedmat5.roughness = 1;
+		this.sharedmats.push( sharedmat5 );
+
+		let sharedmat6 = new Material();
+		sharedmat6.albedoColor = Color3.FromInts(255,0,0);
+		sharedmat6.specularIntensity = 0;
+		sharedmat6.roughness = 1;
+		this.sharedmats.push( sharedmat6 );	
+
+		let sharedmat7 = new Material();
+		sharedmat7.albedoColor = Color3.FromInts(88,44,44);
+		sharedmat7.specularIntensity = 0;
+		sharedmat7.roughness = 1;
+		this.sharedmats.push( sharedmat7 );	
+
 
 	}
 
@@ -1186,6 +1378,19 @@ export class Txstage extends Entity {
     }
 
 
+
+
+    //---------------
+    init_sound( ) {
+    	let snd ;
+        for ( snd in resources.sounds ) {
+            this.sounds[snd]     = new Txsound(this, resources.sounds[snd] );
+        }    
+
+    }
+
+
+
 	//---------
 	// BOOKMARK
 	init_maps() {
@@ -1196,6 +1401,7 @@ export class Txstage extends Entity {
 		let half_ztilecnt = (this.ztilecnt / 2 ) >> 0;
 
 		this.init_surfaces_road();
+		this.init_cemetery();
 		this.init_objects_house();
 
 		for ( i = this.map_min.z  ; i <= this.map_max.z  ; i++ ) {
@@ -1226,12 +1432,10 @@ export class Txstage extends Entity {
 			}
 		}
 		
+		this.spawn_monster(6   * this.tilesize ,12  * this.tilesize  ,1);
+		this.spawn_monster(6.1 * this.tilesize ,12.1 * this.tilesize  ,1);
+		this.spawn_monster(6.2 * this.tilesize ,12.2 * this.tilesize  ,1);
 		
-		
-
-		this.spawn_monster(6,12,1);
-		this.spawn_monster(7,12,2);
-
 
 	}
 
@@ -1240,7 +1444,7 @@ export class Txstage extends Entity {
 
 		let i,j;
 
-		for ( i = -13 ; i < 10 ; i++ ) {
+		for ( i = -19 ; i < 10 ; i++ ) {
 										// Type, reg, rendersurface_i
 			this.surfaces[ 0 + "," + i ]   = [ 2 , 0, -1 ];
 		}
@@ -1257,6 +1461,15 @@ export class Txstage extends Entity {
 		for ( i = 10 ; i < 30 ; i++ ) {
 			this.surfaces[ 20 + "," + i ] = [ 2 , 0, -1 ];
 		}
+
+
+		for ( j = -13 ; j <= 0 ; j++ ) {
+			this.surfaces[ j + "," + -19 ] = [ 2 , 0, -1 ];
+		}
+
+
+		
+
 	}
 
 	//----
@@ -1283,7 +1496,34 @@ export class Txstage extends Entity {
 		}	
 	}
 
+	//---
+	init_cemetery() {
+		
+		let i,j;
+		for ( i = -21 ; i <= -17 ; i++ ) {
+			for ( j = -18; j <= -14 ; j++ ) {
+				this.surfaces[ j + "," + i ] = [ 3 , 0, -1 ];
+			}
+		}
 
+		let coords = [ 
+			[-15,-18],
+			[-15,-20],
+			[-17,-18],
+			[-17,-20]
+		];
+			
+		for ( i = 0 ; i < coords.length ; i++ ) {
+			this.objectmaps[ coords[i][0] + "," + coords[i][1] ] 	= [ 3, 0, -1 ];
+			this.createStaticBox(
+		    				coords[i][0] * this.tilesize ,  
+		    				coords[i][1] * this.tilesize ,  
+		    				this.tilesize/2 ,
+		    				this.tilesize/2, 
+		    				this.world
+		    			);
+		}
+	}
 
 
 
@@ -1299,8 +1539,24 @@ export class Txstage extends Entity {
 	//-----------
 	spawn_monster( x , z, type ) {
 
-		let monsterb2d =  this.createDynamicCircle( x * this.tilesize , z * this.tilesize , this.tilesize /4 , this.world , false );
-		monsterb2d.m_userData = ["m", type, 0, -1 , 0 ] ;
+		let monsterb2d =  this.createDynamicCircle( x  , z  , this.tilesize /4 , this.world , false );
+
+								// m  type  reg  rendermon_i , attacking,   reserve, reseve, damage, hp, maxhp
+		monsterb2d.m_userData = [ 
+								  "m", 
+								  type,   
+								   0,          
+								  -1,         
+								  
+								  0,   //4. attacking 
+								  0,   //5.reserve  
+								  0,   //6. reserve    
+								  
+								  1,    //7.dmg  
+								  7,    //8.hp
+								  7     //9.maxhp 
+								 ] ;
+
 
 	}
 
