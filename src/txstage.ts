@@ -126,7 +126,46 @@ export class Txstage extends Entity {
 
 		// p , , , , attacking, target_xy, target_mon, 
 
-		if ( this.playerb2d.m_userData[4] > 0 ) {
+		if ( this.playerb2d.m_userData[10] > 0 ) {
+
+			// Player dying..
+			this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Die");
+			if ( this.playerb2d.m_userData[10] == 120 ) {
+				this.sounds["scream"].playOnce();
+			}
+    		
+			    		
+    		if ( this.playerb2d.m_userData[10] > 1 ) {
+    		
+    			this.playerb2d.m_userData[10] -= 1;
+    		
+    		} else {
+    				
+    			let spawn_x = this.tilesize * -16;
+    			let spawn_z = this.tilesize * -19;
+
+    			// respawn player after die
+    			this.playerb2d.SetPosition( new b2Vec2( spawn_x, spawn_z ) );
+    			this.playerb2d.m_userData[8] = this.playerb2d.m_userData[9];
+    			this.playerb2d.m_userData[10] = 0;
+
+    			this.playerb2d.m_userData[5].x = this.playerb2d.GetPosition().x;
+				this.playerb2d.m_userData[5].z = this.playerb2d.GetPosition().y;
+
+
+    			this.render_players[ 0 ]["healthbar"].getComponent(Transform).scale.x = 0.95;
+    			this.render_players[ 0 ]["healthbar"].getComponent(Transform).position.x = 0;
+
+
+    			this.sounds["endgame"].playOnce();
+					
+    		}
+
+
+
+
+		} else if ( this.playerb2d.m_userData[4] > 0 ) {
+			// Player attacking .
 
 			this.playerb2d.m_userData[4] -= 1;
 			this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Punch");
@@ -135,6 +174,7 @@ export class Txstage extends Entity {
 
 				let monb2d = this.playerb2d.m_userData[6];
 				
+				// Player hit monster.	
 				if ( this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.9 ) == 1 ) {
 					this.sounds["swordhit"].playOnce();
 					this.monster_gethit( monb2d , this.playerb2d );
@@ -191,8 +231,27 @@ export class Txstage extends Entity {
 			monb2d.m_userData[10] = 80;
 			this.render_monsters[ rendermon_i ].removeComponent( OnPointerDown );
 		}
-		this.render_monsters[ rendermon_i ]["healthbar"].getComponent(Transform).scale.x = monb2d.m_userData[8] * 1.5 / monb2d.m_userData[9] ;
+		let healthbar_transform = this.render_monsters[ rendermon_i ]["healthbar"].getComponent(Transform);
+		healthbar_transform.scale.x 	= monb2d.m_userData[8] * 0.95 / monb2d.m_userData[9] ;
+		healthbar_transform.position.x 	= (monb2d.m_userData[9] - monb2d.m_userData[8]) * 0.95 / ( 2 * monb2d.m_userData[9] )
+	
+	}
 
+	//-----
+	player_gethit( playerb2d , monb2d ) {
+
+		let renderplayer_i = playerb2d.m_userData[3];
+
+		playerb2d.m_userData[8] -= monb2d.m_userData[7];
+		if ( playerb2d.m_userData[8] <= 0 ) {
+			playerb2d.m_userData[8] = 0;
+			playerb2d.m_userData[10] = 120;
+		}
+
+		let healthbar_transform = this.render_players[ renderplayer_i ]["healthbar"].getComponent(Transform);
+		healthbar_transform.scale.x 	=   playerb2d.m_userData[8] * 0.95 / playerb2d.m_userData[9] ;
+		healthbar_transform.position.x 	= (playerb2d.m_userData[9] - playerb2d.m_userData[8]) * 0.95 / ( 2 * playerb2d.m_userData[9] )
+	
 	}
 
 
@@ -230,6 +289,7 @@ export class Txstage extends Entity {
 		    	if ( this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
 
 		    		//log("Hitting ", rendermon_i );
+		    		// Player init attack.
 			    	this.playerb2d.m_userData[4] = 20;
 			    	this.playerb2d.m_userData[6] = monb2d;
 
@@ -264,26 +324,26 @@ export class Txstage extends Entity {
     //-------------
     update_monster( monb2d , rendermon_i ) {
 
-    	let diffx = this.playerb2d.GetPosition().x - monb2d.GetPosition().x ;
-    	let diffz = this.playerb2d.GetPosition().y - monb2d.GetPosition().y  ;
-
-    	let tilesize_aggro 		= this.tilesize * 6;
-    	let tilesize_attack		= this.tilesize * 0.5;
     	
-    	let speed = 0.6;
-    	let distsqr = diffx * diffx + diffz * diffz;
 
     	// m,  type ,   reg,   rendermon_i, attacking, , , ,dmg,hp,maxhp, dying
     	
 
     	if ( monb2d.m_userData[10] > 0 ) {
-
+    		// Dying ticks
 			this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Die");
-			if ( monb2d.m_userData[4] == 10 ) {
+
+
+			if ( monb2d.m_userData[10] == 80 ) {
 				if ( monb2d.m_userData[1] == 2 ) {
+					// Skeleton dies
     				this.sounds["skeletonhit"].playOnce();
+    			} else {
+    				this.sounds["goblinscream"].playOnce();
     			}
     		}    		
+
+
     		if ( monb2d.m_userData[10] > 1 ) {
     			monb2d.m_userData[10] -= 1;
     		} else {
@@ -293,16 +353,38 @@ export class Txstage extends Entity {
 
     	} else if ( monb2d.m_userData[4] > 0 ) {
 
+    		// Attacking ticks
     		monb2d.m_userData[4] -= 1;
     		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Punch");
+    		
     		if ( monb2d.m_userData[4] == 10 ) {
-    			this.sounds["punch"].playOnce();
+    			
+    			let rnd = Math.random();
+    			if ( rnd < monb2d.m_userData[11] ) {
+    				// monster hit player.
+    				this.sounds["punch"].playOnce();
+    				this.player_gethit( this.playerb2d , monb2d );
+    			} else {
+    				this.sounds["growl"].playOnce();
+    			}
     		}
+
 
     	} else {
 
-	    	if ( distsqr < tilesize_aggro * tilesize_aggro ) {
+    		let diffx = this.playerb2d.GetPosition().x - monb2d.GetPosition().x ;
+	    	let diffz = this.playerb2d.GetPosition().y - monb2d.GetPosition().y  ;
 
+	    	let tilesize_aggro 		= this.tilesize * 6;
+	    	let tilesize_attack		= this.tilesize * 0.5;
+	    	
+	    	let speed = 0.6;
+	    	let distsqr = diffx * diffx + diffz * diffz;
+
+    		// Within aggro range
+	    	if ( distsqr < tilesize_aggro * tilesize_aggro && this.playerb2d.m_userData[10] == 0 ) {
+
+	    		// Within attack range
 		    	if ( distsqr > tilesize_attack * tilesize_attack ) {
 
 		    		var rad	 = Math.atan2( diffx, diffz );
@@ -318,7 +400,7 @@ export class Txstage extends Entity {
 
 
 			    } else {
-			    	
+			    	// Init attack.
 			    	monb2d.SetLinearVelocity( new b2Vec2( 0 , 0 ) );
 			    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
 			    	monb2d.m_userData[4] = 20;
@@ -482,7 +564,11 @@ export class Txstage extends Entity {
 				this.render_monsters[ rendermon_i ].getComponent(Transform).position.z = monb2d.GetPosition().y - this.vircam.z; 
 
 				if ( monb2d.m_userData[10] > 0 && monb2d.m_userData[10] < 20 ) {
-					this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 * monb2d.m_userData[10] / 20; 
+					if ( monb2d.m_userData[10] == 1 ) {
+						this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = -999; 
+					} else {
+						this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 * monb2d.m_userData[10] / 20; 
+					}
 				} else {
 					this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 ; 
 				}
@@ -759,24 +845,39 @@ export class Txstage extends Entity {
 		monster.getComponent( GLTFShape ).withCollisions = false;
 		monster["model"] = 2;
 		monster.addComponent( new Animator );
-		monster.addComponent( new OnPointerDown(
+
+		let pointer = new OnPointerDown(
 				(e) => {
 					this.monster_onclick( monid ); 
 				},{
 					hoverText: "Attack"
 				}
 			)
-		);
+
+		monster.addComponent(pointer);
+		monster["pointer"] = pointer;
 
 		this.addClips( monster.getComponent(Animator ) );
 		
 
-		let healthbar = new Entity();
-        healthbar.setParent( monster );
-		healthbar.addComponent( this.shared_planeshape );
-		healthbar.addComponent( new Transform({
+		let healthbarbg = new Entity();
+        healthbarbg.setParent( monster );
+		healthbarbg.addComponent( this.shared_planeshape );
+		healthbarbg.addComponent( new Transform({
 			position: new Vector3(  0,   4,   0),
 			scale   : new Vector3( 1.5,   0.2,   1)
+		}));
+		healthbarbg.addComponent( this.shared_billboard );
+		healthbarbg.addComponent( this.sharedmats[6] );
+		
+
+
+		let healthbar = new Entity();
+        healthbar.setParent( healthbarbg );
+		healthbar.addComponent( this.shared_planeshape );
+		healthbar.addComponent( new Transform({
+			position: new Vector3(   0,   0,   0.02),
+			scale   : new Vector3( 0.95,  0.8,  1)
 		}));
 		healthbar.addComponent( this.shared_billboard );
 		healthbar.addComponent( this.sharedmats[5] );
@@ -811,7 +912,7 @@ export class Txstage extends Entity {
 		playername.setParent( player );
 		playername.addComponent( new TextShape(this.userID) ) ;
 		playername.addComponent( new Transform( {
-			position: new Vector3(0, 2.5, 0),
+			position: new Vector3(0, 3.5, 0),
 			scale:  new Vector3( 0.5, 0.5, 0.5)
 		}));
 		playername.addComponent( this.shared_billboard );
@@ -829,8 +930,33 @@ export class Txstage extends Entity {
 										0,
 										3,
 										 60,
-										 60];
+										 60,
+										 0
+										 ];
 
+		
+		let healthbarbg = new Entity();
+        healthbarbg.setParent( player );
+		healthbarbg.addComponent( this.shared_planeshape );
+		healthbarbg.addComponent( new Transform({
+			position: new Vector3(  0,   3,   0),
+			scale   : new Vector3( 1.5,   0.2,   1)
+		}));
+		healthbarbg.addComponent( this.shared_billboard );
+		healthbarbg.addComponent( this.sharedmats[6] );
+
+
+
+		let healthbar = new Entity();
+        healthbar.setParent( healthbarbg );
+		healthbar.addComponent( this.shared_planeshape );
+		healthbar.addComponent( new Transform({
+			position: new Vector3(  0,   0,   0.02),
+			scale   : new Vector3( 0.95,  0.8,   1)
+		}));
+		healthbar.addComponent( this.shared_billboard );
+		healthbar.addComponent( this.sharedmats[5] );
+		player["healthbar"] = healthbar;								 	
 
 		
 		this.render_players.push( player );
@@ -948,6 +1074,15 @@ export class Txstage extends Entity {
     		}
     		this.render_monsters[ rendermon_i ]["model"] = monb2d_userdata[1];
     	} 
+
+    	if ( !this.render_monsters[ rendermon_i ].hasComponent( OnPointerDown ) ) {
+    		this.render_monsters[ rendermon_i ].addComponent( this.render_monsters[ rendermon_i ]["pointer"] );
+    		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
+    	}
+    	let healthbar_transform = this.render_monsters[ rendermon_i ]["healthbar"].getComponent(Transform);
+		healthbar_transform.scale.x 	= monb2d_userdata[8] * 0.95 / monb2d_userdata[9] ;
+		healthbar_transform.position.x 	= (monb2d_userdata[9] - monb2d_userdata[8]) * 0.95 / ( 2 * monb2d_userdata[9] )
+		
     }
 	
 
@@ -1067,16 +1202,40 @@ export class Txstage extends Entity {
 
     	let welcomeDialog: Dialog[] = [
     		{
-    			text: 'Greeting Traveller.'
+    			text: 'Greeting Traveller. Stay a while and listen.'
     		},
     		{
-    			text: 'To move your character around, left-click on the ground.'
+    			text: 'Bad news! A villager reported to me that he saw Santa being kidnapped by a group of Goblins yesterday'
     		},
     		{
-    			text: 'To attack, left-click on the target. To cast spell (If you have learn use E on the target.)'
+    			text: 'No one seems to know where they are now.'
     		},
     		{
-    			text: 'Town is located at the South. Dungeon is at the North.'
+    			text: 'Can you please help us to search and rescue Santa in order to save the Christmas for this year?'
+    		},
+    		{
+    			text: 'Oh, i forgot that You are new here. Let me teach you some basic controls'
+    		},
+    		{
+    			text: 'So, basically your avatar is being replaced by this guy in blue here. You control him using mouse click' 
+    		},
+    		{
+    			text: 'To move your character around, left-click on the ground. Like how you normally play point and click.'
+    		},
+    		{
+    			text: 'To attack monsters, left-click on the target.)'
+    		},
+    		{
+    			text: 'The actual area is much larger than your viewing window can fit. When you walk around, your viewing window will pan around too.'
+    		},
+    		{
+    			text: 'This road leads to the Town if you go South. You can purchase some goods there.'
+    		},
+    		{
+    			text: 'To the north is unknown territory. You might find what you are looking for there.'
+    		},
+    		{
+    			text: 'Last but not the least, do not take life too seriously. You will never get out of it alive.'
     		},
 			{
 				text: 'Have a nice day.',
@@ -1144,7 +1303,10 @@ export class Txstage extends Entity {
 		    	_this.conversing = true;
 		    	myNPC2.talk([
 		    		{
-						text: 'Wanna Buy Some Weapon?',
+		    			text: 'All the things I really like to do are either immoral, illegal or fattening.'
+		    		},
+		    		{
+						text: 'Care to have a look at what i have to offer in my store?',
 						isEndOfDialog: true,
 						triggeredByNext: () => {
 					    	_this.conversing = false;
@@ -1192,6 +1354,9 @@ export class Txstage extends Entity {
 		    	_this.conversing = true;
 		    	myNPC3.talk([
 		    		{
+		    			text:'People say nothing is impossible, but I do nothing every day'
+		    		},
+		    		{
 						text: 'Wanna Buy Some Potions?',
 						isEndOfDialog: true,
 						triggeredByNext: () => {
@@ -1238,6 +1403,9 @@ export class Txstage extends Entity {
 		    	// On activate 
 		    	_this.conversing = true;
 		    	myNPC4.talk([
+		    		{
+		    			text: 'I shoot an arrow into the air, where it lands I do not care'
+		    		},
 		    		{
 						text: 'Wanna Buy Some Bows and Arrows?',
 						isEndOfDialog: true,
@@ -1296,6 +1464,8 @@ export class Txstage extends Entity {
 
 		let sharedmat2 = new Material();
 		sharedmat2.albedoColor = Color3.FromInts(76,52,26);
+		sharedmat2.specularIntensity = 0;
+		sharedmat2.roughness = 1;
 		this.sharedmats.push( sharedmat2 );
 		
 		let sharedmat3 = new Material();
@@ -1432,11 +1602,7 @@ export class Txstage extends Entity {
 			}
 		}
 		
-		this.spawn_monster(6   * this.tilesize ,12  * this.tilesize  ,1);
-		this.spawn_monster(6.1 * this.tilesize ,12.1 * this.tilesize  ,1);
-		this.spawn_monster(6.2 * this.tilesize ,12.2 * this.tilesize  ,1);
-		
-
+		this.init_monsters();
 	}
 
 	//-----
@@ -1527,7 +1693,66 @@ export class Txstage extends Entity {
 
 
 
+	init_monsters() {
 
+		let coords = [
+			[ 6 , 12 , 1 , 3  ],
+			[ 12 , 6 , 2 , 2  ],
+			
+			[ 22 , 3 , 1 , 3  ],
+			[ 30 , 3 , 1 , 3  ],
+			
+			[ 20 , -10 , 1 , 4  ],
+			[ 30 , -10 , 1 , 4  ],
+
+			[ 20 , -20 , 1 , 4  ],
+			[ 30 , -20 , 1 , 4  ],
+
+			[ 20 , 10 , 1 , 5  ],
+			[ 30 , 10 , 1 , 5  ],
+
+			[ 20 , 20 , 1 , 5  ],
+			[ 30 , 20 , 1 , 5  ],
+			
+			[ -20 , 0 , 1 , 5  ],
+			[ -30 , 0 , 1 , 5  ],
+			[ -20 , 10 , 1 , 5  ],
+			[ -30 , 10 , 1 , 5  ],
+			[ -20 , 20 , 1 , 5  ],
+			[ -30 , 20 , 1 , 5  ],
+
+			[ -20 , -40 , 2 , 5  ],
+			[ -30 , -40 , 2 , 5  ],
+
+			[ -34 , -23 , 2 , 5  ],
+			[  27 , -35 , 1 , 5  ],
+			[   0 ,  35 , 1 , 5  ],
+			
+			[ -20 , 20 , 1 , 5  ],
+			[ -30 , 20 , 1 , 5  ],
+
+			[ -35 , 29 , 1 , 5  ],
+											
+		]	
+
+		let i, j ;
+		for ( i = 0 ; i < coords.length ; i++ ) {
+
+			let cx = coords[i][0];
+			let cz = coords[i][1];
+			let type = coords[i][2];
+			let num_of_mons = coords[i][3];
+
+			for ( j = 0 ; j < num_of_mons ; j++ ) {
+				
+				let mx = cx + Math.random() * 0.5 - 0.25;
+				let mz = cz + Math.random() * 0.5 - 0.25;
+				this.spawn_monster( mx  * this.tilesize , mz  * this.tilesize  , type );
+			}
+		}
+
+
+	}
 
 
 
@@ -1554,7 +1779,9 @@ export class Txstage extends Entity {
 								  
 								  1,    //7.dmg  
 								  7,    //8.hp
-								  7     //9.maxhp 
+								  7,     //9.maxhp
+								  0,     //10. dying tick
+								  0.5 	//11. hitrate	
 								 ] ;
 
 

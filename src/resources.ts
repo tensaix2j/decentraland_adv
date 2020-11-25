@@ -40,7 +40,9 @@ export default {
 		pig: new AudioClip("sounds/pig.mp3"),
 		burp:new AudioClip("sounds/burp.mp3"),
 		wardrum:new AudioClip("sounds/wardrum.mp3"),
-		medieval: new AudioClip("sounds/medieval.mp3")
+		medieval: new AudioClip("sounds/medieval.mp3"),
+		growl: new AudioClip("sounds/growl.mp3"),
+		goblinscream: new AudioClip("sounds/goblinscream.mp3")
 	}
 
 
