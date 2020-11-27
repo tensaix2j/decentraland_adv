@@ -25,8 +25,10 @@ import { getUserAccount, RPCSendableMessage  } from '@decentraland/EthereumContr
 import { Txsound } from "src/txsound";
 import { Perlin } from "src/perlin";
 
-import { NPC }    from '../node_modules/@dcl/npc-utils/index'
-import { Dialog } from '../node_modules/@dcl/npc-utils/utils/types'
+
+import { Txinv_and_stats } from "src/txinv_and_stats"
+import { Txnpc_manager   } from "src/Txnpc_manager"
+
 
 export class Txstage extends Entity {
 
@@ -52,7 +54,7 @@ export class Txstage extends Entity {
 	public perlin;
 
 	public map_min = new Vector3(-40, 0, -40);
-	public map_max = new Vector3( 40, 0,  40);
+	public map_max = new Vector3( 40, 0,  80);
 
 
 
@@ -87,8 +89,10 @@ export class Txstage extends Entity {
 	public monsters_in_range = [];
 
 	public sounds = {};
+	public debug = 0;
 
-
+	public inv_and_stats ;
+	public npc_manager;
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -105,7 +109,6 @@ export class Txstage extends Entity {
 		this.create_shared_materials();
 		this.create_borders();
 		this.create_floors();
-		this.create_npcs();
 		this.create_new_player_entity();
 		this.prepare_inputs();
 
@@ -114,10 +117,11 @@ export class Txstage extends Entity {
         this.init_maps();
         this.render_map();
         this.init_sound();
-
-
-
-	}
+        this.inv_and_stats = new Txinv_and_stats( this );
+        this.npc_manager   = new Txnpc_manager( this );
+        this.npc_manager.create_npcs();
+		
+	}	
 
 	//------
 	update(dt ) {
@@ -167,19 +171,24 @@ export class Txstage extends Entity {
 		} else if ( this.playerb2d.m_userData[4] > 0 ) {
 			// Player attacking .
 
-			this.playerb2d.m_userData[4] -= 1;
-			this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Punch");
 			
-			if ( this.playerb2d.m_userData[4] == 10 ) {
+			// Attacking tick at frame 20
+			if ( this.playerb2d.m_userData[4] == 20 ) {
+
+				this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Punch");
+
+				// at frame 10
+			} else if ( this.playerb2d.m_userData[4] == 10 ) {
 
 				let monb2d = this.playerb2d.m_userData[6];
-				
-				// Player hit monster.	
-				if ( this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.9 ) == 1 ) {
+				if ( monb2d != null ) {	
+					// Player hit monster.	
 					this.sounds["swordhit"].playOnce();
 					this.monster_gethit( monb2d , this.playerb2d );
+					this.playerb2d.m_userData[6] = null;
 				}
 			}
+			this.playerb2d.m_userData[4] -= 1;
 			    	
 
 		} else {
@@ -216,7 +225,7 @@ export class Txstage extends Entity {
 		this.vircam.z = this.playerb2d.GetPosition().y;
 		
 		this.render_map();
-		
+		this.inv_and_stats.update();
 	}
 
 	//--------
@@ -251,7 +260,8 @@ export class Txstage extends Entity {
 		let healthbar_transform = this.render_players[ renderplayer_i ]["healthbar"].getComponent(Transform);
 		healthbar_transform.scale.x 	=   playerb2d.m_userData[8] * 0.95 / playerb2d.m_userData[9] ;
 		healthbar_transform.position.x 	= (playerb2d.m_userData[9] - playerb2d.m_userData[8]) * 0.95 / ( 2 * playerb2d.m_userData[9] )
-	
+		
+		this.inv_and_stats.update_player_stats();
 	}
 
 
@@ -272,8 +282,36 @@ export class Txstage extends Entity {
 	}	
 
 
+	//-----
+	find_monster_within_player() {
+
+		let search_range_x = this.tilesize * 0.7;
+		let search_range_z = this.tilesize * 0.7;
+
+		this.box2daabb.lowerBound = new b2Vec2( this.playerb2d.GetPosition().x - search_range_x  , this.playerb2d.GetPosition().y - search_range_z  );
+		this.box2daabb.upperBound = new b2Vec2( this.playerb2d.GetPosition().x + search_range_x  , this.playerb2d.GetPosition().y + search_range_z  );
+		
+		this.monsters_in_range.length = 0;
+		this.world.QueryAABB( this.box2dcallback , this.box2daabb);
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	//-------------------
+	// if you can click exactly then ok, then hit the one selected.
 	monster_onclick( rendermon_i ) {
 		
 		//log( monster_onclick );
@@ -305,6 +343,48 @@ export class Txstage extends Entity {
 			    }		
 			}
 		}
+			
+	}
+
+
+
+	//-------------------
+	// Clicking on monster is hard, so if inaccurately click still can attack.
+	player_doattack( ) {
+		
+		
+		if ( this.playerb2d.m_userData[4] == 0 ) {
+			
+			this.playerb2d.m_userData[5].x = this.playerb2d.GetPosition().x;
+			this.playerb2d.m_userData[5].z = this.playerb2d.GetPosition().y;
+			this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
+			this.playerb2d.m_userData[4] = 20;
+			
+			this.find_monster_within_player();
+
+			let i;
+			
+			for ( i = 0 ; i < this.monsters_in_range.length ; i++ ) {
+
+				let monb2d = this.monsters_in_range[i];
+				if ( monb2d.m_userData[10] == 0 && this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
+
+		    		//log("Hitting ", rendermon_i );
+		    		// Player init attack.
+			    	this.playerb2d.m_userData[6] = monb2d;
+
+			    	let diffx = monb2d.GetPosition().x - this.playerb2d.GetPosition().x  ;
+					let diffz = monb2d.GetPosition().y - this.playerb2d.GetPosition().y  ;
+
+			    	let rad	 = Math.atan2( diffx, diffz );
+			    	let deg  = rad * 180.0 / Math.PI ;
+
+			    	
+			    	this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+			    }
+		    }		
+		}
+		
 			
 	}
 
@@ -424,9 +504,10 @@ export class Txstage extends Entity {
 		
 		this.monsters_in_range.length = 0;
 		this.world.QueryAABB( this.box2dcallback , this.box2daabb);
-			
 	}
 
+
+	
 
 
 	//-----------
@@ -445,6 +526,9 @@ export class Txstage extends Entity {
 		this.render_players[0].getComponent(Transform).position.y = 0.5 ; 
 		this.render_players[0].getComponent(Transform).position.x = this.playerb2d.GetPosition().x - this.vircam.x; 
 		this.render_players[0].getComponent(Transform).position.z = this.playerb2d.GetPosition().y - this.vircam.z; 
+
+
+
 		
 		// Floor 
 		this.movablefloor.getComponent( Transform ).position.x = -this.vircam.x % this.tilesize;
@@ -734,6 +818,7 @@ export class Txstage extends Entity {
 	global_input_down(e) {
 		
 		if ( e.buttonId == 0 ) {
+
 			if ( e.hit ) {
 
 				let hitEntity = engine.entities[e.hit.entityId];
@@ -747,6 +832,10 @@ export class Txstage extends Entity {
 					if ( this.conversing ) {
 						return ;
 					}
+					if ( this.inv_and_stats.visiting_shop > 0 ) {
+						return ;
+					}
+
 	
 					let transform = this.getComponent(Transform);
 
@@ -774,8 +863,11 @@ export class Txstage extends Entity {
 
 				} 
 			}
+
 		} else if ( e.buttonId == 1 ) {
-			log( this.vircam_tile.x , this.vircam_tile.z , this.playerb2d.GetPosition().x , this.playerb2d.GetPosition().y  );
+			
+			this.player_doattack();
+
 		}
     }
 
@@ -845,7 +937,6 @@ export class Txstage extends Entity {
 		monster.getComponent( GLTFShape ).withCollisions = false;
 		monster["model"] = 2;
 		monster.addComponent( new Animator );
-
 		let pointer = new OnPointerDown(
 				(e) => {
 					this.monster_onclick( monid ); 
@@ -856,7 +947,7 @@ export class Txstage extends Entity {
 
 		monster.addComponent(pointer);
 		monster["pointer"] = pointer;
-
+		
 		this.addClips( monster.getComponent(Animator ) );
 		
 
@@ -917,6 +1008,12 @@ export class Txstage extends Entity {
 		}));
 		playername.addComponent( this.shared_billboard );
 
+
+
+
+
+
+
 		this.playerb2d = this.createDynamicCircle(  
 			0 ,  
 			0 ,  
@@ -927,12 +1024,21 @@ export class Txstage extends Entity {
 		this.playerb2d.m_userData = ["p", 
 										0, 0,0,0, 
 										new Vector3(0,0,0),
-										0,
+										null,
 										3,
 										 60,
 										 60,
 										 0
 										 ];
+
+
+		if ( this.debug == 1 ) {
+			let dx = 20 * this.tilesize;
+			let dz = 29 * this.tilesize;
+			this.playerb2d.SetPosition( new b2Vec2( dx , dz  ) );
+			this.playerb2d.m_userData[5].x = dx;
+			this.playerb2d.m_userData[5].z = dz;
+		}									 
 
 		
 		let healthbarbg = new Entity();
@@ -1039,20 +1145,28 @@ export class Txstage extends Entity {
     //-----------
     readjust_object_model ( j , i , object_i ) {
 
-    	if (  this.objectmaps[ j + "," + i ][0] != this.render_objects[ object_i ]["model"] ) {
+    	let object_type = this.objectmaps[ j + "," + i ][0];
+    	if (  object_type != this.render_objects[ object_i ]["model"] ) {
 
     		this.render_objects[ object_i ].removeComponent( GLTFShape );
-    			
-    		if ( this.objectmaps[ j + "," + i ][0] == 1 ) {
+    		
+    		this.render_objects[ object_i ].getComponent( Transform ).scale.y = 1;
+
+    		if ( object_type == 1 ) {
     			this.render_objects[ object_i ].addComponent( resources.models.tree );
     				
-    		} else if ( this.objectmaps[ j + "," + i ][0] == 2 ) {
+    		} else if ( object_type == 2 ) {
     			this.render_objects[ object_i ].addComponent( resources.models.house );
     		
-    		} else if ( this.objectmaps[ j + "," + i ][0] == 3 ) {
+    		} else if (object_type == 3 ) {
     			this.render_objects[ object_i ].addComponent( resources.models.tombstone );
     			
-
+    		}  else if ( object_type == 4 ) {
+    			
+    			let wallheight =  this.objectmaps[ j + "," + i ][3];
+    			this.render_objects[ object_i ].getComponent( Transform ).scale.y = wallheight + 1;
+    			this.render_objects[ object_i ].addComponent( resources.models.cubeblock );
+    			
     		}
     		this.render_objects[ object_i ]["model"] = this.objectmaps[ j + "," + i ][0];
     	} 
@@ -1075,14 +1189,15 @@ export class Txstage extends Entity {
     		this.render_monsters[ rendermon_i ]["model"] = monb2d_userdata[1];
     	} 
 
-    	if ( !this.render_monsters[ rendermon_i ].hasComponent( OnPointerDown ) ) {
-    		this.render_monsters[ rendermon_i ].addComponent( this.render_monsters[ rendermon_i ]["pointer"] );
-    		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
-    	}
     	let healthbar_transform = this.render_monsters[ rendermon_i ]["healthbar"].getComponent(Transform);
 		healthbar_transform.scale.x 	= monb2d_userdata[8] * 0.95 / monb2d_userdata[9] ;
 		healthbar_transform.position.x 	= (monb2d_userdata[9] - monb2d_userdata[8]) * 0.95 / ( 2 * monb2d_userdata[9] )
 		
+		if ( !this.render_monsters[ rendermon_i ].hasComponent( OnPointerDown ) ) {
+    		this.render_monsters[ rendermon_i ].addComponent( this.render_monsters[ rendermon_i ]["pointer"] );
+    		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
+    	}
+    	
     }
 	
 
@@ -1182,265 +1297,9 @@ export class Txstage extends Entity {
     }
 
 
+    dd
 
 
-
-   
-
-
-
-
-
-
-
-
-
-
-    create_npcs() {
-
-    	let _this = this;
-
-    	let welcomeDialog: Dialog[] = [
-    		{
-    			text: 'Greeting Traveller. Stay a while and listen.'
-    		},
-    		{
-    			text: 'Bad news! A villager reported to me that he saw Santa being kidnapped by a group of Goblins yesterday'
-    		},
-    		{
-    			text: 'No one seems to know where they are now.'
-    		},
-    		{
-    			text: 'Can you please help us to search and rescue Santa in order to save the Christmas for this year?'
-    		},
-    		{
-    			text: 'Oh, i forgot that You are new here. Let me teach you some basic controls'
-    		},
-    		{
-    			text: 'So, basically your avatar is being replaced by this guy in blue here. You control him using mouse click' 
-    		},
-    		{
-    			text: 'To move your character around, left-click on the ground. Like how you normally play point and click.'
-    		},
-    		{
-    			text: 'To attack monsters, left-click on the target.)'
-    		},
-    		{
-    			text: 'The actual area is much larger than your viewing window can fit. When you walk around, your viewing window will pan around too.'
-    		},
-    		{
-    			text: 'This road leads to the Town if you go South. You can purchase some goods there.'
-    		},
-    		{
-    			text: 'To the north is unknown territory. You might find what you are looking for there.'
-    		},
-    		{
-    			text: 'Last but not the least, do not take life too seriously. You will never get out of it alive.'
-    		},
-			{
-				text: 'Have a nice day.',
-				isEndOfDialog: true,
-				triggeredByNext: () => {
-			    	_this.conversing = false;
-			    }
-			},
-		]
-
-		let myNPC = new NPC(
-		    { 
-		    	position: new Vector3( 0, -999, 0),
-		    	scale: new Vector3(0.15,0.15,0.15)
-		    }, 
-		    'models/knight.glb', 
-		    () => {
-		    	// On activate 
-		    	_this.conversing = true;
-		    	_this.playerb2d.m_userData[5].x = _this.playerb2d.GetPosition().x;
-		    	_this.playerb2d.m_userData[5].z = _this.playerb2d.GetPosition().y;
-
-		    	myNPC.talk(welcomeDialog, 0);
-		    },
-		    {
-				idleAnim: 'Walking',
-				portrait: { path: 'models/knight_ui.png', offsetX: 40, height: 128, width: 128  },
-			    coolDownDuration: 3,
-			    hoverText: 'CHAT',
-			    onlyClickTrigger: true,
-			    continueOnWalkAway: true,
-			    onWalkAway: () => {
-				
-				},
-			}
-		)
-		myNPC.getComponent(Transform).rotation.eulerAngles = new Vector3(0, -180, 0 );
-		myNPC.getComponent( GLTFShape ).withCollisions = false;
-
-		myNPC.setParent(this);
-		myNPC["virtualPosition"] = new Vector3(0,  0.5 , 1 * this.tilesize);
-		this.createStaticCircle(	
-			myNPC["virtualPosition"].x,  
-			myNPC["virtualPosition"].z,  
-			this.tilesize / 8 , 
-			this.world
-		);
-		this.render_npcs.push( myNPC );
-
-
-
-
-
-
-
-
-		let myNPC2 = new NPC(
-		    { 
-		    	position: new Vector3( 0, -999, 0),
-		    	scale: new Vector3(0.15,0.15,0.15)
-		    }, 
-		    'models/giant.glb', 
-		    () => {
-		    	// On activate 
-		    	_this.conversing = true;
-		    	myNPC2.talk([
-		    		{
-		    			text: 'All the things I really like to do are either immoral, illegal or fattening.'
-		    		},
-		    		{
-						text: 'Care to have a look at what i have to offer in my store?',
-						isEndOfDialog: true,
-						triggeredByNext: () => {
-					    	_this.conversing = false;
-					    }
-					}
-				], 0);
-		    },
-		    {
-				idleAnim: 'Walking',
-				portrait: { path: 'models/giant_ui.png', offsetX: 40, height: 128, width: 128  },
-			    coolDownDuration: 3,
-			    hoverText: 'CHAT',
-			    onlyClickTrigger: true,
-			    continueOnWalkAway: true,
-			    onWalkAway: () => {
-				
-				},
-			}
-		)
-		myNPC2.getComponent(Transform).rotation.eulerAngles = new Vector3(0, 90, 0 );
-		myNPC2.getComponent( GLTFShape ).withCollisions = false;
-		
-		myNPC2.setParent(this);
-		myNPC2["virtualPosition"] = new Vector3(-3 * this.tilesize , 0.6   , -11 * this.tilesize );
-		this.createStaticCircle(	
-			myNPC2["virtualPosition"].x,  
-			myNPC2["virtualPosition"].z,  
-			this.tilesize / 8 , 
-			this.world
-		);
-		this.render_npcs.push( myNPC2 );
-
-
-
-
-
-		let myNPC3 = new NPC(
-		    { 
-		    	position: new Vector3( 0, -999, 0),
-		    	scale: new Vector3(0.15,0.15,0.15)
-		    }, 
-		    'models/wizard.glb', 
-		    () => {
-		    	// On activate 
-		    	_this.conversing = true;
-		    	myNPC3.talk([
-		    		{
-		    			text:'People say nothing is impossible, but I do nothing every day'
-		    		},
-		    		{
-						text: 'Wanna Buy Some Potions?',
-						isEndOfDialog: true,
-						triggeredByNext: () => {
-					    	_this.conversing = false;
-					    }
-					}
-				], 0);
-		    },
-		    {
-				idleAnim: 'Walking',
-				portrait: { path: 'models/wizard_ui.png', offsetX: 40, height: 128, width: 128  },
-			    coolDownDuration: 3,
-			    hoverText: 'CHAT',
-			    onlyClickTrigger: true,
-			    continueOnWalkAway: true,
-			    onWalkAway: () => {
-				
-				},
-			}
-		)
-		myNPC3.getComponent(Transform).rotation.eulerAngles = new Vector3(0, -90, 0 );
-		myNPC3.getComponent( GLTFShape ).withCollisions = false;
-		myNPC3.setParent(this);
-		myNPC3["virtualPosition"] = new Vector3( 3 * this.tilesize , 0.6   , -11 * this.tilesize );
-		this.createStaticCircle(	
-			myNPC3["virtualPosition"].x,  
-			myNPC3["virtualPosition"].z,  
-			this.tilesize / 8 , 
-			this.world
-		);
-		this.render_npcs.push( myNPC3 );
-
-
-
-
-
-		let myNPC4 = new NPC(
-		    { 
-		    	position: new Vector3( 0, -999, 0),
-		    	scale: new Vector3(0.15,0.15,0.15)
-		    }, 
-		    'models/archer.glb', 
-		    () => {
-		    	// On activate 
-		    	_this.conversing = true;
-		    	myNPC4.talk([
-		    		{
-		    			text: 'I shoot an arrow into the air, where it lands I do not care'
-		    		},
-		    		{
-						text: 'Wanna Buy Some Bows and Arrows?',
-						isEndOfDialog: true,
-						triggeredByNext: () => {
-					    	_this.conversing = false;
-					    }
-					}
-				], 0);
-		    },
-		    {
-				idleAnim: 'Walking',
-				portrait: { path: 'models/archer_ui.png', offsetX: 40, height: 128, width: 128  },
-			    coolDownDuration: 3,
-			    hoverText: 'CHAT',
-			    onlyClickTrigger: true,
-			    continueOnWalkAway: true,
-			    onWalkAway: () => {
-				
-				},
-			}
-		)
-		myNPC4.getComponent(Transform).rotation.eulerAngles = new Vector3(0, 90, 0 );
-		myNPC4.getComponent( GLTFShape ).withCollisions = false;
-		myNPC4.setParent(this);
-		myNPC4["virtualPosition"] = new Vector3( -2 * this.tilesize , 0.6   , -13 * this.tilesize );
-		this.createStaticCircle(	
-			myNPC4["virtualPosition"].x,  
-			myNPC4["virtualPosition"].z,  
-			this.tilesize / 8 , 
-			this.world
-		);
-		this.render_npcs.push( myNPC4 );
-
-
-    }
 
 
     //----
@@ -1573,31 +1432,49 @@ export class Txstage extends Entity {
 		this.init_surfaces_road();
 		this.init_cemetery();
 		this.init_objects_house();
+		this.init_dungeon();
 
 		for ( i = this.map_min.z  ; i <= this.map_max.z  ; i++ ) {
 			for ( j = this.map_min.x  ; j <= this.map_max.x  ; j++ ) {
 
-				if ( this.surfaces[ j + "," + i ] == null && this.objectmaps[ j + "," + i ] == null ) {
+				let inside_dungeon = 0;
+				if ( j >= 5 && j <= 40 && i>= 30 && i <=75 ) {
+					// Dungeon
+					inside_dungeon = 1;
+				}
+
+				if ( inside_dungeon == 1 ) {
+
+					if ( this.objectmaps[ j + "," + i ] == null ) {
+						rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
+						if ( rnd < 0.3 ) {
+							this.surfaces[ j + "," + i ] = [3 , 0, -1] ;
+						}
+					}
+
+				} else {
+					if ( this.surfaces[ j + "," + i ] == null && this.objectmaps[ j + "," + i ] == null  ) {
+							
+						rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
+						if ( rnd < 0.2 ) {
+							this.objectmaps[ j + "," + i ] = [ 1 , 0 , -1 ] ;
+
+							this.createStaticCircle(  
+			    				j * this.tilesize ,  
+			    				i * this.tilesize ,  
+			    				this.tilesize / 8 , 
+			    				this.world
+			    			);
+						}
+
 						
-					rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
-					if ( rnd < 0.2 ) {
-						this.objectmaps[ j + "," + i ] = [ 1 , 0 , -1 ] ;
+						rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
+						if ( rnd < 0.4 ) {
+							this.surfaces[ j + "," + i ] = [1 , 0, -1] ;
+						}
+						
 
-						this.createStaticCircle(  
-		    				j * this.tilesize ,  
-		    				i * this.tilesize ,  
-		    				this.tilesize / 8 , 
-		    				this.world
-		    			);
 					}
-
-					
-					rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
-					if ( rnd < 0.4 ) {
-						this.surfaces[ j + "," + i ] = [1 , 0, -1] ;
-					}
-					
-
 				}
 			}
 		}
@@ -1693,6 +1570,9 @@ export class Txstage extends Entity {
 
 
 
+
+
+	//-----------------------
 	init_monsters() {
 
 		let coords = [
@@ -1755,7 +1635,101 @@ export class Txstage extends Entity {
 	}
 
 
+	//---------------------
+	init_dungeon() {
+		let i, j ;
 
+		
+
+
+		for ( i = 30 ; i <= 75 ; i++ ) {
+			for ( j = 5 ; j <= 40 ; j++ ) {
+
+				if ( j == 20 && i >= 30 && i <= 50 ) {
+					// Narrow corridor into the cave
+
+
+				} else if ( j >= 19 &&  j <= 21 && i >= 54 && i <= 61 ) {
+					// Narrow corridor into the last room
+
+
+
+				} else if ( j >= 13 &&  j <= 13 && i >= 47 && i <= 48 ) {
+					// Narrow corridor into the left room1
+				
+				} else if ( j >= 13 &&  j <= 15 && i >= 49 && i <= 50 ) {
+					// Narrow corridor into the left room1
+					
+			
+				} else if ( j >= 7 &&  j <= 9 && i >= 41 && i <= 41 ) {
+					// Narrow corridor into the left room2
+				
+				} else if ( j >= 7 &&  j <= 8 && i >= 54 && i <= 54 ) {
+					// Narrow corridor into the left room2
+								
+
+				} else if ( j >= 6 &&  j <= 6 && i >= 41 && i <= 54 ) {
+					// Narrow corridor into the left room2
+
+
+				
+				} else if ( j >= 31 &&  j <= 34 && i >= 42 && i <= 43 ) {
+					// Narrow corridor into the right room1
+
+
+				} else if ( j >= 25 &&  j <= 25 && i >= 46 && i <= 48 ) {
+					// Narrow corridor into the right room1
+				
+				} else if ( j >= 13 &&  j <= 15 && i >= 49 && i <= 50 ) {
+					// Narrow corridor into the right room1
+				
+				
+				} else if ( j >= 31 &&  j <= 34 && i >= 42 && i <= 43 ) {
+					// Narrow corridor into the right room2
+					
+				} else if ( j >= 35 &&  j <= 36 && i >= 42 && i <= 55 ) {
+					// Narrow corridor into the right room2
+					
+
+				} else if ( j >= 11 && j <= 31 && i >= 62 && i <= 71  ) {	
+					// Last Big room
+
+				} else if ( j >= 16 && j <= 25 && i >= 49 && i <= 53  ) {	
+					// middle room
+				
+				
+
+				} else if ( j >= 10 && j <= 16 && i >= 40 && i <= 46  ) {	
+					// left room1
+
+					
+				} else if ( j >= 9 && j <= 12 && i >= 53 && i <= 56  ) {	
+					// left room2
+
+				} else if ( j >= 25 && j <= 30 && i >= 40 && i <= 45  ) {	
+					// right room1
+				} else if ( j >= 32 && j <= 36 && i >= 56 && i <= 57  ) {	
+					// right room2
+										
+
+				} else {
+
+					let wallheight = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
+
+					this.objectmaps[ j + "," + i ] 	= [ 4 , 0, -1 , wallheight ];
+					this.createStaticBox(
+			    				j * this.tilesize  ,  
+			    				i * this.tilesize  ,  
+			    				this.tilesize ,
+			    				this.tilesize, 
+			    				this.world
+			    			);
+
+				}
+
+			}
+		}
+	}
 
 
 

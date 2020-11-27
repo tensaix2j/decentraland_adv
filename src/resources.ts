@@ -12,11 +12,38 @@ export default {
 		warrior:new GLTFShape("models/warrior.glb"),
 		goblin: new GLTFShape("models/goblin.glb"),
 		goblinspear: new GLTFShape("models/goblinspear.glb"),
-		tombstone: new GLTFShape("models/tombstone.glb")
+		tombstone: new GLTFShape("models/tombstone.glb"),
+		cubeblock: new GLTFShape("models/cubeblock.glb")
 	},
 	textures: {
 		floor: new Texture("models/floor.png"),
-		surfacepatch: new Texture("models/surfacepatch.png")
+		surfacepatch: new Texture("models/surfacepatch.png"),
+
+		inventory: new Texture("models/inventory.png"),
+		emptyslot: new Texture("models/emptyslot.png"),
+
+		selectedslot: new Texture("models/selectedslot.png"),
+		equippedslot: new Texture("models/equippedslot.png"),
+
+		eqp_bronze_sword: new Texture("models/bronzesword.png"),
+		eqp_bronze_shield: new Texture("models/bronzeshield.png"),
+		eqp_bronze_helmet: new Texture("models/bronzehelmet.png"),
+		eqp_bronze_armor: new Texture("models/bronzearmor.png"),
+		eqp_bronze_pant: new Texture("models/bronzepant.png"),
+		eqp_bronze_boot: new Texture("models/bronzeboot.png"),
+		
+		eqp_iron_sword: new Texture("models/ironsword.png"),
+		eqp_iron_shield: new Texture("models/ironshield.png"),
+		eqp_iron_helmet: new Texture("models/ironhelmet.png"),
+		eqp_iron_armor: new Texture("models/ironarmor.png"),
+		eqp_iron_pant: new Texture("models/ironpant.png"),
+		eqp_iron_boot: new Texture("models/ironboot.png"),
+
+		potion_health: new Texture("models/healthpotion.png"),
+
+		uiframe: new Texture("models/uiframe.png"),
+		uiframesmall: new Texture("models/uiframesmall.png")
+
 	},
 	sounds: {
 		whoosh: new AudioClip("sounds/whoosh.mp3"),
@@ -42,7 +69,8 @@ export default {
 		wardrum:new AudioClip("sounds/wardrum.mp3"),
 		medieval: new AudioClip("sounds/medieval.mp3"),
 		growl: new AudioClip("sounds/growl.mp3"),
-		goblinscream: new AudioClip("sounds/goblinscream.mp3")
+		goblinscream: new AudioClip("sounds/goblinscream.mp3"),
+		drink:new AudioClip("sounds/drink.mp3")
 	}
 
 
