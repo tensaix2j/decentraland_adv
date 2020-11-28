@@ -13,8 +13,11 @@ export default {
 		goblin: new GLTFShape("models/goblin.glb"),
 		goblinspear: new GLTFShape("models/goblinspear.glb"),
 		tombstone: new GLTFShape("models/tombstone.glb"),
-		cubeblock: new GLTFShape("models/cubeblock.glb")
+		cubeblock: new GLTFShape("models/cubeblock.glb"),
+		arrow: new GLTFShape("models/arrow.glb")
 	},
+
+	
 	textures: {
 		floor: new Texture("models/floor.png"),
 		surfacepatch: new Texture("models/surfacepatch.png"),

@@ -27,7 +27,7 @@ import { Perlin } from "src/perlin";
 
 
 import { Txinv_and_stats } from "src/txinv_and_stats"
-import { Txnpc_manager   } from "src/Txnpc_manager"
+import { Txnpc_manager   } from "src/txnpc_manager"
 
 
 export class Txstage extends Entity {
@@ -64,6 +64,7 @@ export class Txstage extends Entity {
 	public render_npcs 		= [];
 	public render_monsters 	= [];
 	public render_players 	= [];
+	public render_projectiles = [];
 
 
 
@@ -86,13 +87,18 @@ export class Txstage extends Entity {
 	public world;
 	public box2daabb;
 	public box2dcallback; 
-	public monsters_in_range = [];
+	public box2dcallback_pjt; 
+	
+	public b2d_in_range = [];
 
 	public sounds = {};
 	public debug = 0;
 
 	public inv_and_stats ;
 	public npc_manager;
+
+	public mousedown = 0;
+	public physicsCast;
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -120,13 +126,33 @@ export class Txstage extends Entity {
         this.inv_and_stats = new Txinv_and_stats( this );
         this.npc_manager   = new Txnpc_manager( this );
         this.npc_manager.create_npcs();
+
+       	
+        this.physicsCast = PhysicsCast.instance;
+			
 		
 	}	
 
 	//------
 	update(dt ) {
-		
+
 		this.world.Step( 0.05  , 10, 10 );
+
+
+		/*		
+		if ( this.mousedown == 1 ) {
+			// Use this as mouse over
+			let rayFromCamera = this.physicsCast.getRayFromCamera(100);
+			this.physicsCast.hitFirst(
+				rayFromCamera,
+				(e2) => {
+					this.mouseover(e2.hitPoint.x , e2.hitPoint.z);
+				},
+				0
+			)
+		}
+		*/
+		
 
 		// p , , , , attacking, target_xy, target_mon, 
 
@@ -226,6 +252,7 @@ export class Txstage extends Entity {
 		
 		this.render_map();
 		this.inv_and_stats.update();
+		this.npc_manager.update();
 	}
 
 	//--------
@@ -256,11 +283,6 @@ export class Txstage extends Entity {
 			playerb2d.m_userData[8] = 0;
 			playerb2d.m_userData[10] = 120;
 		}
-
-		let healthbar_transform = this.render_players[ renderplayer_i ]["healthbar"].getComponent(Transform);
-		healthbar_transform.scale.x 	=   playerb2d.m_userData[8] * 0.95 / playerb2d.m_userData[9] ;
-		healthbar_transform.position.x 	= (playerb2d.m_userData[9] - playerb2d.m_userData[8]) * 0.95 / ( 2 * playerb2d.m_userData[9] )
-		
 		this.inv_and_stats.update_player_stats();
 	}
 
@@ -291,7 +313,7 @@ export class Txstage extends Entity {
 		this.box2daabb.lowerBound = new b2Vec2( this.playerb2d.GetPosition().x - search_range_x  , this.playerb2d.GetPosition().y - search_range_z  );
 		this.box2daabb.upperBound = new b2Vec2( this.playerb2d.GetPosition().x + search_range_x  , this.playerb2d.GetPosition().y + search_range_z  );
 		
-		this.monsters_in_range.length = 0;
+		this.b2d_in_range.length = 0;
 		this.world.QueryAABB( this.box2dcallback , this.box2daabb);
 	}
 
@@ -364,9 +386,9 @@ export class Txstage extends Entity {
 
 			let i;
 			
-			for ( i = 0 ; i < this.monsters_in_range.length ; i++ ) {
+			for ( i = 0 ; i < this.b2d_in_range.length ; i++ ) {
 
-				let monb2d = this.monsters_in_range[i];
+				let monb2d = this.b2d_in_range[i];
 				if ( monb2d.m_userData[10] == 0 && this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
 
 		    		//log("Hitting ", rendermon_i );
@@ -401,12 +423,50 @@ export class Txstage extends Entity {
 		animator.getClip(clipname).playing 		= true;
 	}
 
+
+	//----------
+	update_projectile( pjtb2d , renderpjt_i ) {
+		
+		if ( pjtb2d.m_userData[10] > 0 ) {
+			// Dying ticks 
+			if ( pjtb2d.m_userData[10] > 1 ) {
+    			pjtb2d.m_userData[10] -= 1;
+    		} else {
+    			this.world.DestroyBody( pjtb2d );
+    		}
+		} else {
+
+			let diffx = pjtb2d.m_userData[5].x - pjtb2d.GetPosition().x ;
+	    	let diffz = pjtb2d.m_userData[5].z - pjtb2d.GetPosition().y ;
+
+	    	let distsqr = diffx * diffx + diffz * diffz;
+	    	let hitrange = this.tilesize * 0.5;
+	    	let speed    = 3.5;
+
+    		if ( distsqr > hitrange * hitrange  ) {
+    			
+    			var rad	 = Math.atan2( diffx, diffz );
+			    var deg  = rad * 180.0 / Math.PI ;
+			    var delta_x = speed * Math.sin(rad);
+			    var delta_z = speed * Math.cos(rad);
+
+			    pjtb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
+			    this.render_projectiles[ renderpjt_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+			    	
+
+    		} else {
+    			// hit
+    			pjtb2d.m_userData[10] = 10;
+    		}
+		}	
+	}
+
     //-------------
     update_monster( monb2d , rendermon_i ) {
 
-    	
+    	let i;
 
-    	// m,  type ,   reg,   rendermon_i, attacking, , , ,dmg,hp,maxhp, dying
+	    // m,  type ,   reg,   rendermon_i, attacking, , , ,dmg,hp,maxhp, dying
     	
 
     	if ( monb2d.m_userData[10] > 0 ) {
@@ -435,18 +495,29 @@ export class Txstage extends Entity {
 
     		// Attacking ticks
     		monb2d.m_userData[4] -= 1;
+
     		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Punch");
     		
-    		if ( monb2d.m_userData[4] == 10 ) {
+    		if ( monb2d.m_userData[4] == monb2d.m_userData[12] - 10 ) {
     			
-    			let rnd = Math.random();
-    			if ( rnd < monb2d.m_userData[11] ) {
-    				// monster hit player.
-    				this.sounds["punch"].playOnce();
-    				this.player_gethit( this.playerb2d , monb2d );
+    			if ( monb2d.m_userData[1] == 3 ) {
+    				
+    				// Spear goblin creates projectile here.
+    				this.spawn_projectile( monb2d.GetPosition().x , monb2d.GetPosition().y , 1 , this.playerb2d.GetPosition().x, this.playerb2d.GetPosition().y );
+    				this.sounds["arrowshoot"].playOnce();
+
     			} else {
-    				this.sounds["growl"].playOnce();
-    			}
+    				
+    				// Melee
+	    			let rnd = Math.random();
+	    			if ( rnd < monb2d.m_userData[11] ) {
+	    				// monster hit player.
+	    				this.sounds["punch"].playOnce();
+	    				this.player_gethit( this.playerb2d , monb2d );
+	    			} else {
+	    				this.sounds["growl"].playOnce();
+	    			}
+	    		}
     		}
 
 
@@ -455,27 +526,27 @@ export class Txstage extends Entity {
     		let diffx = this.playerb2d.GetPosition().x - monb2d.GetPosition().x ;
 	    	let diffz = this.playerb2d.GetPosition().y - monb2d.GetPosition().y  ;
 
-	    	let tilesize_aggro 		= this.tilesize * 6;
-	    	let tilesize_attack		= this.tilesize * 0.5;
+	    	let range_aggro 		= this.tilesize * 6;
+	    	let range_attack		= this.get_monster_attack_range( monb2d.m_userData[1] );
 	    	
 	    	let speed = 0.6;
 	    	let distsqr = diffx * diffx + diffz * diffz;
 
     		// Within aggro range
-	    	if ( distsqr < tilesize_aggro * tilesize_aggro && this.playerb2d.m_userData[10] == 0 ) {
+	    	if ( distsqr < range_aggro * range_aggro && this.playerb2d.m_userData[10] == 0 ) {
 
+	    		var rad	 = Math.atan2( diffx, diffz );
+			    var deg  = rad * 180.0 / Math.PI ;
+			    this.render_monsters[ rendermon_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+			    		
 	    		// Within attack range
-		    	if ( distsqr > tilesize_attack * tilesize_attack ) {
+		    	if ( distsqr > range_attack * range_attack ) {
 
-		    		var rad	 = Math.atan2( diffx, diffz );
-			    	var deg  = rad * 180.0 / Math.PI ;
-			    	var delta_x = speed * Math.sin(rad);
+		    		var delta_x = speed * Math.sin(rad);
 			    	var delta_z = speed * Math.cos(rad);
 
 			    	monb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
 
-
-			    	this.render_monsters[ rendermon_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
 			    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Walking");
 
 
@@ -483,11 +554,22 @@ export class Txstage extends Entity {
 			    	// Init attack.
 			    	monb2d.SetLinearVelocity( new b2Vec2( 0 , 0 ) );
 			    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
-			    	monb2d.m_userData[4] = 20;
+			    	monb2d.m_userData[4] = monb2d.m_userData[12] ;
+			    	 
 			    }
 			} 
 		}
 
+    }
+
+    //----
+    get_monster_attack_range( montype ) { 
+    	
+    	if ( montype == 3 ) {
+    		return this.tilesize * 5;
+    	} else { 
+    		return this.tilesize * 0.6;
+    	}
     }
 
 
@@ -502,10 +584,24 @@ export class Txstage extends Entity {
 		this.box2daabb.lowerBound = new b2Vec2( this.playerb2d.GetPosition().x - search_range_x  , this.playerb2d.GetPosition().y - search_range_z  );
 		this.box2daabb.upperBound = new b2Vec2( this.playerb2d.GetPosition().x + search_range_x  , this.playerb2d.GetPosition().y + search_range_z  );
 		
-		this.monsters_in_range.length = 0;
+		this.b2d_in_range.length = 0;
 		this.world.QueryAABB( this.box2dcallback , this.box2daabb);
+	
 	}
 
+	//--------
+	find_projectiles_within_window() {
+
+		let search_range_x = this.tilesize * (this.xtilecnt / 2 >> 0) - this.tilesize ;
+		let search_range_z = this.tilesize * (this.ztilecnt / 2 >> 0) - this.tilesize ;
+
+		this.box2daabb.lowerBound = new b2Vec2( this.playerb2d.GetPosition().x - search_range_x  , this.playerb2d.GetPosition().y - search_range_z  );
+		this.box2daabb.upperBound = new b2Vec2( this.playerb2d.GetPosition().x + search_range_x  , this.playerb2d.GetPosition().y + search_range_z  );
+		
+		this.b2d_in_range.length = 0;
+		this.world.QueryAABB( this.box2dcallback_pjt , this.box2daabb);
+	
+	}
 
 	
 
@@ -611,9 +707,9 @@ export class Txstage extends Entity {
 		this.find_monster_within_window();
 
 
-		for ( i = 0 ; i < this.monsters_in_range.length ; i++ ) {
+		for ( i = 0 ; i < this.b2d_in_range.length ; i++ ) {
 			
-			let monb2d = this.monsters_in_range[i];
+			let monb2d = this.b2d_in_range[i];
 			// m, type, reg, rendermon_i 
 			if ( monb2d.m_userData[2] == 0 ) {
 				
@@ -662,6 +758,82 @@ export class Txstage extends Entity {
 			
 		}
 		
+
+
+
+		// Projectiles
+		for ( i = 0 ; i < this.render_projectiles.length ; i++ ) {
+			
+			if ( this.render_projectiles[i]["used_by"] != null ) {
+				
+				let pjtb2d = this.render_projectiles[i]["used_by"];
+				let pjt_x = pjtb2d.GetPosition().x ;
+				let pjt_z = pjtb2d.GetPosition().y ;
+
+				if ( 
+					( pjt_x < this.vircam.x - half_xtilecnt * this.tilesize ) ||
+					( pjt_x > this.vircam.x + half_xtilecnt * this.tilesize ) ||
+					( pjt_z < this.vircam.z - half_ztilecnt * this.tilesize ) ||
+					( pjt_z > this.vircam.z + half_ztilecnt * this.tilesize ) 
+				) {
+
+					pjtb2d.m_userData[2] = 0;
+					engine.removeEntity( this.render_projectiles[ i ] );
+					//this.render_projectiles[ i ].getComponent(Transform).position.y = -999;
+				 	this.render_projectiles[ i ]["used_by"] = null;
+					
+				}
+			}   
+		}
+
+		
+		this.find_projectiles_within_window();
+
+		for ( i = 0 ; i < this.b2d_in_range.length ; i++ ) {
+			
+			let pjtb2d = this.b2d_in_range[i];
+
+			// m, type, reg, renderpjt_i 
+			if ( pjtb2d.m_userData[2] == 0 ) {
+				
+				let renderpjt_i = this.get_unused_render_item_index( this.render_projectiles ) ;
+				if ( renderpjt_i == -1 ) {
+					renderpjt_i = this.create_new_projectile_entity();
+					
+				} else {
+					engine.addEntity( this.render_projectiles[ renderpjt_i ] );
+					
+				}
+
+				if ( renderpjt_i > -1 ) {
+
+					//this.readjust_projectile_model ( pjtb2d.m_userData , renderpjt_i );
+							
+					this.render_projectiles[ renderpjt_i ]["used_by"] = pjtb2d;
+					pjtb2d.m_userData[2] = 1;
+					pjtb2d.m_userData[3] = renderpjt_i;
+				}	
+
+			} else {
+
+				let renderpjt_i = pjtb2d.m_userData[3];
+				
+				
+				this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.x = pjtb2d.GetPosition().x - this.vircam.x; 
+				this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.z = pjtb2d.GetPosition().y - this.vircam.z; 
+
+				if ( pjtb2d.m_userData[10] > 0 ) {
+					// b2d Can be reused
+					this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.y = -999; 
+				} else {
+					this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.y = 0.5 ; 
+				}
+
+				this.update_projectile( pjtb2d , renderpjt_i );
+			} 
+			
+		}
+
 
 
 
@@ -808,24 +980,33 @@ export class Txstage extends Entity {
 
 
 
+	mouseover( ex, ez ) {
 
+		//log( ex, ez );
+		let transform = this.getComponent(Transform);
+
+		this.playerb2d.m_userData[5].x = ex - transform.position.x + this.vircam.x ;
+		this.playerb2d.m_userData[5].z = ez - transform.position.z + this.vircam.z ;
+
+	}
 
 	//----
 	global_input_up(e) {
-		
-    }
+		this.mousedown = 0;
+
+	}
+
+
     //----
 	global_input_down(e) {
-		
+			
 		if ( e.buttonId == 0 ) {
 
 			if ( e.hit ) {
 
+				this.mousedown = 1;
+				
 				let hitEntity = engine.entities[e.hit.entityId];
-
-				//if ( engine.entities[e.hit.entityId].hasComponent(OnPointerDown)) {
-    			//	return ;
-    			//}
 
 				if ( typeof hitEntity != "undefined"   ) {
 					
@@ -836,11 +1017,7 @@ export class Txstage extends Entity {
 						return ;
 					}
 
-	
 					let transform = this.getComponent(Transform);
-
-					
-					//log( e.hit.hitPoint.x - transform.position.x , e.hit.hitPoint.z - transform.position.z );
 					this.playerb2d.m_userData[5].x = e.hit.hitPoint.x - transform.position.x + this.vircam.x ;
 					this.playerb2d.m_userData[5].z = e.hit.hitPoint.z - transform.position.z + this.vircam.z ;
 
@@ -856,18 +1033,17 @@ export class Txstage extends Entity {
 					if ( this.playerb2d.m_userData[5].z > this.map_max.z * this.tilesize) {	
 						this.playerb2d.m_userData[5].z = this.map_max.z * this.tilesize;
 					}	
-
-
-
-					
-
-				} 
+				}
+				 
 			}
 
 		} else if ( e.buttonId == 1 ) {
 			
 			this.player_doattack();
 
+		} else if ( e.buttonId == 2 ) {
+
+			
 		}
     }
 
@@ -920,6 +1096,25 @@ export class Txstage extends Entity {
 		this.render_objects.push( object );
 
 		return this.render_objects.length - 1;
+    }
+
+
+    //---------------
+    create_new_projectile_entity() {
+    	
+    	let projectile = new Entity();
+    	let pjtid 	   = this.render_projectiles.length;
+    	projectile.setParent( this );
+    	projectile.addComponent( new Transform({
+    		position: new Vector3(0, -999, 0 ),
+    		scale   : new Vector3( 1 , 1, 1 )
+    	}));
+    	projectile.addComponent( resources.models.arrow );
+    	projectile.getComponent( GLTFShape ).withCollisions = false;
+    	projectile["model"] = 1;
+    	this.render_projectiles.push( projectile );
+		return this.render_projectiles.length - 1;
+
     }
 
 
@@ -1173,19 +1368,42 @@ export class Txstage extends Entity {
     }
 
 
+    //----------------------
+    readjust_projectile_model( pjtb2d_userdata, renderpjt_i ) {
+
+    	if (  pjtb2d_userdata[1] != this.render_projectiles[ renderpjt_i ]["model"] ) {
+
+    		this.render_projectiles[ renderpjt_i ].removeComponent( GLTFShape );
+    		if ( pjtb2d_userdata[1] == 1 ) {
+    			this.render_projectiles[ renderpjt_i ].addComponent( resources.models.arrow );
+    		} 
+    		this.render_projectiles[ renderpjt_i ]["model"] = pjtb2d_userdata[1];
+    	} 
+
+    }
+
+
     //-----------
     readjust_monster_model ( monb2d_userdata , rendermon_i ) {
 
     	if (  monb2d_userdata[1] != this.render_monsters[ rendermon_i ]["model"] ) {
 
     		this.render_monsters[ rendermon_i ].removeComponent( GLTFShape );
-    			
+    		
+
     		if ( monb2d_userdata[1] == 1 ) {
     			this.render_monsters[ rendermon_i ].addComponent( resources.models.goblin );
     				
     		} else if (  monb2d_userdata[1] == 2 ) {
     			this.render_monsters[ rendermon_i ].addComponent( resources.models.skeleton );
+    		
+    		} else if (  monb2d_userdata[1] == 3 ) {
+    			this.render_monsters[ rendermon_i ].addComponent( resources.models.goblinspear );
     		}
+
+
+
+
     		this.render_monsters[ rendermon_i ]["model"] = monb2d_userdata[1];
     	} 
 
@@ -1195,8 +1413,9 @@ export class Txstage extends Entity {
 		
 		if ( !this.render_monsters[ rendermon_i ].hasComponent( OnPointerDown ) ) {
     		this.render_monsters[ rendermon_i ].addComponent( this.render_monsters[ rendermon_i ]["pointer"] );
-    		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
     	}
+    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
+    	
     	
     }
 	
@@ -1344,6 +1563,7 @@ export class Txstage extends Entity {
 		sharedmat5.bumpTexture = resources.textures.surfacepatch;
 		sharedmat5.specularIntensity = 0;
 		sharedmat5.roughness = 1;
+		sharedmat5.transparencyMode = 1;
 		this.sharedmats.push( sharedmat5 );
 
 		let sharedmat6 = new Material();
@@ -1399,10 +1619,19 @@ export class Txstage extends Entity {
 		this.box2dcallback.ReportFixture = function( evt ) { 
 
 			if ( evt.m_body.m_userData != null && evt.m_body.m_userData[0] == "m" ) {
-				_this.monsters_in_range.push( evt.m_body );
+				_this.b2d_in_range.push( evt.m_body );
 			}
 			return true;
 		};
+
+		this.box2dcallback_pjt = new b2QueryCallback();
+		this.box2dcallback_pjt.ReportFixture = function( evt ) { 
+
+			if ( evt.m_body.m_userData != null && evt.m_body.m_userData[0] == "pjt" ) {
+				_this.b2d_in_range.push( evt.m_body );
+			}
+			return true;
+		};		
 
     }
 
@@ -1577,7 +1806,9 @@ export class Txstage extends Entity {
 
 		let coords = [
 			[ 6 , 12 , 1 , 3  ],
-			[ 12 , 6 , 2 , 2  ],
+
+			// skele
+			//[ 12 , 6 , 2 , 2  ],
 			
 			[ 22 , 3 , 1 , 3  ],
 			[ 30 , 3 , 1 , 3  ],
@@ -1612,6 +1843,9 @@ export class Txstage extends Entity {
 			[ -30 , 20 , 1 , 5  ],
 
 			[ -35 , 29 , 1 , 5  ],
+
+
+			[ 18, 2 , 3,  1 ],
 											
 		]	
 
@@ -1732,7 +1966,16 @@ export class Txstage extends Entity {
 	}
 
 
+	//-------------
+	spawn_projectile( x , z, type , dst_x, dst_z ) {
 
+		let projectileb2d = this.createDynamicSensorCircle( x , z , this.tilesize/4 , this.world, 1 );
+
+		// pjt  type  reg  renderpjt_i , reserve, target_xz
+		projectileb2d.m_userData = [ "pjt" ,  type , 0, -1 , 0 , new Vector3(dst_x, 0 , dst_z ),0,0,0,0,0 ];
+
+
+	}
 
 
 	//-----------
@@ -1740,6 +1983,17 @@ export class Txstage extends Entity {
 
 		let monsterb2d =  this.createDynamicCircle( x  , z  , this.tilesize /4 , this.world , false );
 
+
+		/*	
+			type 1: goblin 
+			type 2: skeleton 
+			type 3: spear goblin
+	
+
+		*/
+
+		let attackduration = 20;
+		
 								// m  type  reg  rendermon_i , attacking,   reserve, reseve, damage, hp, maxhp
 		monsterb2d.m_userData = [ 
 								  "m", 
@@ -1755,7 +2009,8 @@ export class Txstage extends Entity {
 								  7,    //8.hp
 								  7,     //9.maxhp
 								  0,     //10. dying tick
-								  0.5 	//11. hitrate	
+								  0.5, 	//11. hitrate	
+								  attackduration    //12. attackduration
 								 ] ;
 
 

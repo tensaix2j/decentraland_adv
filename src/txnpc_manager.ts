@@ -17,6 +17,7 @@ import { Dialog } from '../node_modules/@dcl/npc-utils/utils/types'
 export class Txnpc_manager {
 
 	public stage;
+	public target_npc = -1;
 
 	//-------------------
 	constructor( stage ) {
@@ -25,6 +26,34 @@ export class Txnpc_manager {
 
 	}
 
+	//---------------------
+	npc_onclick( npc_id ) {
+		
+		let npcb2d = this.stage.render_npcs[npc_id]["b2d"];
+		if ( npcb2d != null && this.stage.is_within_distance( npcb2d , this.stage.playerb2d , this.stage.tilesize * 2 ) == 1 ) {
+			
+			this.target_npc = -1;
+			this.stage.render_npcs[npc_id].activate() ;
+
+		} else {
+			this.target_npc = npc_id;
+		}
+
+	}
+
+	//-----
+	update() {
+		
+		if ( this.target_npc != -1 ) {
+			let npcb2d = this.stage.render_npcs[this.target_npc]["b2d"];
+			if ( npcb2d != null && this.stage.is_within_distance( npcb2d , this.stage.playerb2d , this.stage.tilesize * 2 ) == 1 ) {
+				
+				this.stage.render_npcs[this.target_npc].activate() ;
+				this.target_npc = -1;
+				
+			}
+		}
+	}
 
 	//-------------------
     create_npcs() {
@@ -105,15 +134,19 @@ export class Txnpc_manager {
 		)
 		myNPC.getComponent(Transform).rotation.eulerAngles = new Vector3(0, -180, 0 );
 		myNPC.getComponent( GLTFShape ).withCollisions = false;
+		
+		
+
 
 		myNPC.setParent(_this);
 		myNPC["virtualPosition"] = new Vector3(0,  0.5 , 1 * _this.tilesize);
-		_this.createStaticCircle(	
+		let npcb2d = _this.createStaticCircle(	
 			myNPC["virtualPosition"].x,  
 			myNPC["virtualPosition"].z,  
 			_this.tilesize / 8 , 
 			_this.world
 		);
+		
 		_this.render_npcs.push( myNPC );
 
 
@@ -307,7 +340,7 @@ export class Txnpc_manager {
 		    		},
 		    		
 		    		{
-						text: 'Wanna Buy Some Bows and Arrows?',
+						text: 'Wanna Buy Some Weapons?',
 						isQuestion: true,
 						buttons:[
 							{ 
