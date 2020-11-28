@@ -2,6 +2,7 @@
 
 import resources from "src/resources";
 import { Txclickable_image } from "src/txclickable_image"
+import * as ui from '../node_modules/@dcl/ui-utils/index'
 
 
 export class Txinv_and_stats extends Entity {
@@ -29,8 +30,6 @@ export class Txinv_and_stats extends Entity {
 	public shop_selected_item_canvas;
 
 	public visiting_shop = 0;
-	public alert_msg;
-	public alert_msg_tick = 0;
 
 
 	public player_stats_caption;
@@ -49,6 +48,8 @@ export class Txinv_and_stats extends Entity {
 
 	public virpos_caption;
 	public stage ;
+	public tick = 0;
+
 
 	constructor( stage ) {
 		
@@ -87,6 +88,13 @@ export class Txinv_and_stats extends Entity {
 
 	visit_shop( shop_id ) {
 
+		if ( this.tick > 30 * 180 ) {
+			this.random_shop_items(0);
+			this.random_shop_items(1);
+			this.random_shop_items(2);
+			this.tick = 0;
+		}
+
 		this.shop_inventories.length = 0;
 			
 		let i, j ;
@@ -101,7 +109,73 @@ export class Txinv_and_stats extends Entity {
 	}
 
 
+	//----------------------------
+	gen_random_armor() {
+		let j;
+		
+		let armor_partid = this.random_int( this.armor_parts.length ); 
+		let armor_part   = this.armor_parts[armor_partid] ;
+		let armor_matid  = this.random_int( this.armor_mats.length );
+		let armor_mat 	 = this.armor_mats[armor_matid]; 
 
+		let cost = armor_matid * 1000 + 500;	
+		let armor_val = 1 + armor_matid;
+		let dmg_val   = 0;
+
+		let addattrs = [0,0,0,0,0,0];
+		for ( j = 0 ; j < 6 ; j++ ) {
+			let addattr = this.random_int(10);
+			if ( addattr >= 6 ) {
+				addattr -= 6;
+			} else {
+				addattr = 0;
+			}
+			addattrs[j] = addattr;
+			cost += ( addattr * 200 );
+		}	
+		return ["eqp_" + armor_mat + "_" + armor_part , cost  , armor_val ,dmg_val   ,addattrs[0] , addattrs[1], addattrs[2], addattrs[3], addattrs[4], addattrs[5]   ]
+	}
+
+
+	//----------
+	gen_random_weapon() { 
+
+		let j;
+		let weapon_partid = this.random_int( this.weapon_parts.length ); 
+		let weapon_part   = this.weapon_parts[weapon_partid] ;
+		let weapon_matid  = this.random_int( this.weapon_mats.length );
+		let weapon_mat 	 = this.weapon_mats[weapon_matid]; 
+
+		let cost = weapon_matid * 1000 + 500;	
+		let armor_val = 0;
+		let dmg_val   = 1 + weapon_matid;
+
+		let addattrs = [0,0,0,0,0,0];
+		for ( j = 0 ; j < 6 ; j++ ) {
+			let addattr = this.random_int(10);
+			if ( addattr >= 6 ) {
+				addattr -= 6;
+			} else {
+				addattr = 0;
+			}
+			addattrs[j] = addattr;
+			cost += ( addattr * 200 );
+		}
+		return  ["eqp_" + weapon_mat + "_" + weapon_part , cost  , armor_val ,dmg_val   ,addattrs[0] , addattrs[1], addattrs[2], addattrs[3], addattrs[4], addattrs[5]   ] 
+				
+	}
+
+	//----
+	gen_random_potion() {
+		
+		return ["potion_health", 50 ] 
+	}
+
+
+
+
+
+	//-------------------------------
 	random_shop_items( shop_id ) {
 		
 		let i,j;
@@ -110,34 +184,15 @@ export class Txinv_and_stats extends Entity {
 		if ( shop_id == 0 ) {
 			for ( i = 0 ; i < 15 ; i++ ) {
 
-				let armor_partid = this.random_int( this.armor_parts.length ); 
-				let armor_part   = this.armor_parts[armor_partid] ;
-				let armor_matid  = this.random_int( this.armor_mats.length );
-				let armor_mat 	 = this.armor_mats[armor_matid]; 
-
-				let cost = armor_matid * 1000 + 500;	
-				let armor_val = 1 + armor_matid;
-				let dmg_val   = 0;
-
-				let addattrs = [0,0,0,0,0,0];
-				for ( j = 0 ; j < 6 ; j++ ) {
-					let addattr = this.random_int(10);
-					if ( addattr >= 6 ) {
-						addattr -= 6;
-					} else {
-						addattr = 0;
-					}
-					addattrs[j] = addattr;
-					cost += ( addattr * 200 );
-				}
-				this.shops[ shop_id ].push( ["eqp_" + armor_mat + "_" + armor_part , cost  , armor_val ,dmg_val   ,addattrs[0] , addattrs[1], addattrs[2], addattrs[3], addattrs[4], addattrs[5]   ] )
-				
+				let armor = this.gen_random_armor();
+				this.shops[ shop_id ].push( armor )
 			}
 		} else if ( shop_id == 1 ) {
 			
 
 			for ( i = 0 ; i < 10 ; i++ ) {
-				this.shops[ shop_id ].push( ["potion_health", 50 ] )
+				let potion = this.gen_random_potion();
+				this.shops[ shop_id ].push( potion)
 			}
 
 
@@ -146,29 +201,8 @@ export class Txinv_and_stats extends Entity {
 
 
 			for ( i = 0 ; i < 5 ; i++ ) {
-
-				let weapon_partid = this.random_int( this.weapon_parts.length ); 
-				let weapon_part   = this.weapon_parts[weapon_partid] ;
-				let weapon_matid  = this.random_int( this.weapon_mats.length );
-				let weapon_mat 	 = this.weapon_mats[weapon_matid]; 
-
-				let cost = weapon_matid * 1000 + 500;	
-				let armor_val = 0;
-				let dmg_val   = 1 + weapon_matid;
-
-				let addattrs = [0,0,0,0,0,0];
-				for ( j = 0 ; j < 6 ; j++ ) {
-					let addattr = this.random_int(10);
-					if ( addattr >= 6 ) {
-						addattr -= 6;
-					} else {
-						addattr = 0;
-					}
-					addattrs[j] = addattr;
-					cost += ( addattr * 200 );
-				}
-				this.shops[ shop_id ].push( ["eqp_" + weapon_mat + "_" + weapon_part , cost  , armor_val ,dmg_val   ,addattrs[0] , addattrs[1], addattrs[2], addattrs[3], addattrs[4], addattrs[5]   ] )
-				
+				let weapon = this.gen_random_weapon();
+				this.shops[ shop_id ].push(weapon)
 			}
 		}
 	}
@@ -183,6 +217,8 @@ export class Txinv_and_stats extends Entity {
 	inventory_item_onclick( id , owner ) {
 		
 		//log( id , owner );
+		this.stage.sounds["buttonclick"].playOnce();
+
 
 		if ( owner == "player" ) {
 			
@@ -229,10 +265,42 @@ export class Txinv_and_stats extends Entity {
 		this.stage.sounds["drink"].playOnce();
 	}
 
+	//----------
+	drink_from_inventory() {
+		
+		let i ;
+		let hasdrank = 0;
+
+		for ( i = 0 ; i < this.inventories.length ; i++ ) {
+			if ( this.inventories[i][0] == "potion_health" ) {
+
+				hasdrank = 1;
+				this.drinkpotion();
+				this.inventory_selected_slot = -1;						
+				this.inventories.splice( i , 1 );
+				
+				this.update_inventory_2d_ui();
+				this.update_selected_item_ui();
+				this.update_player_stats();
+
+				break;
+			}
+		}
+		if ( hasdrank == 0 ) {
+			this.stage.sounds["denied"].playOnce();
+			ui.displayAnnouncement('No HP potion in the inventory!', 5, true, Color4.Red(), 20, false);
+		}
+	}
+
+
+
 	//--
 	button_onclick( action ) { 
 		
 		log( "button_onclick" , action );
+
+		this.stage.sounds["buttonclick"].playOnce();
+
 
 		if ( action == "selected_item_use" ) {
 
@@ -282,6 +350,10 @@ export class Txinv_and_stats extends Entity {
 			this.update_selected_item_ui();
 			this.update_player_stats();
 
+			this.stage.spawn_pickables( 
+				this.stage.playerb2d.GetPosition().x ,
+				this.stage.playerb2d.GetPosition().y ,
+				item );
 
 
 
@@ -352,10 +424,12 @@ export class Txinv_and_stats extends Entity {
 
 
 				} else {
-					this.display_alert_msg( "Inventory is full.");
+					ui.displayAnnouncement('Inventory is full!', 5, true, Color4.White(), 20, false);
+
 				}
 			} else {
-				this.display_alert_msg( "Not enough money.");
+				ui.displayAnnouncement('Not enough money', 5, true, Color4.White(), 20, false);
+
 			}
 
 		} else if (action.substr(0,7) == "addstat") {
@@ -377,7 +451,6 @@ export class Txinv_and_stats extends Entity {
 
 		this.player_stats["level"] 		= 1;
 		this.player_stats["exp"] 		= 0;
-		this.player_stats["nextexp"] 	= 100;
 		this.player_stats["money"] 		= 500;
 		this.player_stats["str"] 		= 10;
 		this.player_stats["vit"] 		= 10;
@@ -385,6 +458,37 @@ export class Txinv_and_stats extends Entity {
 		this.player_stats["int"] 		= 10;
 		this.player_stats["remaining_points"] = 5;
 
+	}
+
+	//--------
+	gain_exp( exp ) {
+		this.player_stats["exp"] += exp ;
+		if ( this.player_stats["exp"] >= this.exp_needed[ this.player_stats["level"] - 1 ] ) {
+
+			// log("levelup");
+			this.player_stats["exp"]   = this.player_stats["exp"] % this.exp_needed[ this.player_stats["level"] - 1 ];
+			this.player_stats["level"] += 1;
+
+			ui.displayAnnouncement('LEVEL UP!', 15, true, Color4.Yellow(), 20, false);
+			this.stage.sounds["levelup"].playOnce();
+			this.player_stats["remaining_points"] += 5;
+
+			this.calculate_derived_stats();	
+			this.stage.playerb2d.m_userData[8] = this.stage.playerb2d.m_userData[9];
+		}
+		this.update_player_stats();	
+		
+	}
+
+	//----
+	lose_exp( ) {
+		let exp_to_lose = this.exp_needed[ this.player_stats["level"] - 1 ];
+		this.player_stats["exp"] -= exp_to_lose;
+		if ( this.player_stats["exp"] < 0 ) {
+			this.player_stats["exp"] = 0;
+		}
+		this.update_player_stats();	
+			
 	}
 
 	
@@ -408,12 +512,12 @@ export class Txinv_and_stats extends Entity {
 		}
 
 		let ui_2d_inventory_caption = new UIText( ui_2d_inventory );
-		ui_2d_inventory_caption.value = "Inventory: Click on the item to select.\n"
+		ui_2d_inventory_caption.value = "Inventory: Click on the item to select.\nPress F to drink HP potion from inventory."
 		ui_2d_inventory_caption.vAlign = "top";
 		ui_2d_inventory_caption.vTextAlign = "top";
 		ui_2d_inventory_caption.isPointerBlocker = false;
 		ui_2d_inventory_caption.hAlign = "left";
-		ui_2d_inventory_caption.positionY = 20;	
+		ui_2d_inventory_caption.positionY = 40;	
 
 
 
@@ -877,15 +981,6 @@ export class Txinv_and_stats extends Entity {
 		
 
 
-		let alert_msg = new UIText( ui_2d_canvas );
-		alert_msg.vAlign = "top";
-		alert_msg.vTextAlign = "top";
-		alert_msg.hAlign = "center";
-		alert_msg.fontSize = 30;
-		alert_msg.value = "";
-		alert_msg.positionY = -30;
-		this.alert_msg = alert_msg;
-
 
 	}	
 
@@ -956,7 +1051,7 @@ export class Txinv_and_stats extends Entity {
 		this.player_stats_caption.value = "Player Stats:\n\n";
 
 		this.player_stats_caption.value += "Level : "+ this.player_stats["level"] +"\n";
-		this.player_stats_caption.value += "EXP : "+this.player_stats["exp"]+" / "+ this.player_stats["nextexp"] +"\n";
+		this.player_stats_caption.value += "EXP : "+this.player_stats["exp"]+" / "+  this.exp_needed[ this.player_stats["level"] - 1 ] +"\n";
 
 
 
@@ -1049,27 +1144,11 @@ export class Txinv_and_stats extends Entity {
 	}
 
 
-	//--------
-	display_alert_msg( msg ) {
-		this.alert_msg.positionY = -30;
-		this.alert_msg.value = msg;
-		this.alert_msg.visible = true;
-		this.alert_msg_tick = 100;
-	}
-
+	
 
 
 	update() {
 		
-		if ( this.alert_msg_tick > 0 ) {
-			
-			this.alert_msg_tick -= 1;
-			if ( this.alert_msg_tick == 0 ) {
-				this.alert_msg.visible = false;
-			}
-		} 
-
-
 		let halfx = this.stage.tilesize / 2 ;
 		let halfz = halfx;
 		if ( this.stage.playerb2d.GetPosition().x < 0 ) {
@@ -1082,7 +1161,7 @@ export class Txinv_and_stats extends Entity {
 		let player_tile_z = ( this.stage.playerb2d.GetPosition().y + halfz / this.stage.tilesize ) >> 0 ;
 			
 		this.virpos_caption.value = player_tile_x + ","  + player_tile_z ;
-
+		this.tick += 1 ;
 
 	}
 
@@ -1232,6 +1311,105 @@ export class Txinv_and_stats extends Entity {
 		return desc;
 	}
 
-	
+	public exp_needed = [
+		500,
+		1000,
+		2250,
+		4125,
+		6300,
+		8505,
+		10206,
+		11510,
+		13319,
+		14429,
+		18036,
+		22545,
+		28181,
+		35226,
+		44033,
+		55042,
+		68801,
+		86002,
+		107503,
+		134378,
+		167973,
+		209966,
+		262457,
+		328072,
+		410090,
+		512612,
+		640765,
+		698434,
+		761293,
+		829810,
+		904492,
+		985897,
+		1074627,
+		1171344,
+		1276765,
+		1391674,
+		1516924,
+		1653448,
+		1802257,
+		1964461,
+		2141263,
+		2333976,
+		2544034,
+		2772997,
+		3022566,
+		3294598,
+		3591112,
+		3914311,
+		4266600,
+		4650593,
+		5069147,
+		5525370,
+		6022654,
+		6564692,
+		7155515,
+		7799511,
+		8501467,
+		9266598,
+		10100593,
+		11009646,
+		12000515,
+		13080560,
+		14257811,
+		15541015,
+		16939705,
+		18464279,
+		20126064,
+		21937409,
+		23911777,
+		26063836,
+		28409582,
+		30966444,
+		33753424,
+		36791232,
+		40102443,
+		43711663,
+		47645713,
+		51933826,
+		56607872,
+		61702579,
+		67255812,
+		73308835,
+		79906630,
+		87098226,
+		94937067,
+		103481403,
+		112794729,
+		122946255,
+		134011418,
+		146072446,
+		159218965,
+		173548673,
+		189168053,
+		206193177,
+		224750564,
+		244978115,
+		267026144,
+		291058498
+	];
 
 }

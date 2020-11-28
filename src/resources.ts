@@ -46,6 +46,8 @@ export default {
 
 		potion_health: new Texture("models/healthpotion.png"),
 
+		item_money: new Texture("models/itemmoney.png"),
+
 		uiframe: new Texture("models/uiframe.png"),
 		uiframesmall: new Texture("models/uiframesmall.png")
 
@@ -75,7 +77,10 @@ export default {
 		medieval: new AudioClip("sounds/medieval.mp3"),
 		growl: new AudioClip("sounds/growl.mp3"),
 		goblinscream: new AudioClip("sounds/goblinscream.mp3"),
-		drink:new AudioClip("sounds/drink.mp3")
+		drink:new AudioClip("sounds/drink.mp3"),
+		itemdrop: new AudioClip("sounds/itemdrop.mp3"),
+		levelup: new AudioClip("sounds/levelup.mp3"),
+		goldcoin: new AudioClip("sounds/goldcoin.mp3")
 	}
 
 

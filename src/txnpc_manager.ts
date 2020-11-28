@@ -55,6 +55,17 @@ export class Txnpc_manager {
 		}
 	}
 
+	//---------
+	end_all_npc_interactions() {
+		let i ;
+		for ( i = 0 ; i <  this.stage.render_npcs.length ; i++ ) {
+			this.stage.render_npcs[i].endInteraction();
+		}
+		this.stage.conversing = false;
+		
+	}
+
+
 	//-------------------
     create_npcs() {
 
@@ -115,8 +126,7 @@ export class Txnpc_manager {
 		    () => {
 		    	// On activate 
 		    	_this.conversing = true;
-		    	_this.playerb2d.m_userData[5].x = _this.playerb2d.GetPosition().x;
-		    	_this.playerb2d.m_userData[5].z = _this.playerb2d.GetPosition().y;
+		    	_this.cmd_stopmoving = 1;
 
 		    	myNPC.talk(welcomeDialog, 0);
 		    },

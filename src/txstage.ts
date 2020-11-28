@@ -17,6 +17,7 @@ import {b2DistanceJointDef} from "src/Box2D/Dynamics/Joints/b2DistanceJoint"
 import {b2ContactListener} from "src/Box2D/Dynamics/b2WorldCallbacks"
 import {b2AABB}  from "src/Box2D/Collision/b2Collision"
 
+import * as ui from '../node_modules/@dcl/ui-utils/index'
 
 
 import resources from "src/resources";
@@ -107,6 +108,9 @@ export class Txstage extends Entity {
 	public mousedown = 0;
 	public physicsCast;
 
+	public cmd_stopmoving = 0;
+
+
 	constructor( id, userID , transform_args , camera ) {
 
 		super();
@@ -127,24 +131,20 @@ export class Txstage extends Entity {
 
 		
         this.perlin = new Perlin();
-        this.init_maps();
-        this.render_map();
-        this.init_sound();
         this.inv_and_stats = new Txinv_and_stats( this );
         this.npc_manager   = new Txnpc_manager( this );
         this.npc_manager.create_npcs();
-
-       	
         this.physicsCast = PhysicsCast.instance;
 		
-		this.spawn_pickables( 1 , 1 , "potion_health" );
-		this.spawn_pickables( 1 , 1 , "eqp_iron_armor" );
-		this.spawn_pickables( 1 , 1 , "eqp_iron_pant" );
 		
+		this.init_maps();
+        this.init_sound();
+        	
 		
 	}	
 
 	//------
+	// BOOKMARK UPDATE
 	update(dt ) {
 
 		this.world.Step( 0.05  , 10, 10 );
@@ -165,98 +165,7 @@ export class Txstage extends Entity {
 		*/
 		
 
-		// p , , , , attacking, target_xy, target_mon, 
-
-		if ( this.playerb2d.m_userData[10] > 0 ) {
-
-			// Player dying..
-			this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Die");
-			if ( this.playerb2d.m_userData[10] == 120 ) {
-				this.sounds["scream"].playOnce();
-			}
-    		
-			    		
-    		if ( this.playerb2d.m_userData[10] > 1 ) {
-    		
-    			this.playerb2d.m_userData[10] -= 1;
-    		
-    		} else {
-    				
-    			let spawn_x = this.tilesize * -16;
-    			let spawn_z = this.tilesize * -19;
-
-    			// respawn player after die
-    			this.playerb2d.SetPosition( new b2Vec2( spawn_x, spawn_z ) );
-    			this.playerb2d.m_userData[8] = this.playerb2d.m_userData[9];
-    			this.playerb2d.m_userData[10] = 0;
-
-    			this.playerb2d.m_userData[5].x = this.playerb2d.GetPosition().x;
-				this.playerb2d.m_userData[5].z = this.playerb2d.GetPosition().y;
-
-
-    			this.render_players[ 0 ]["healthbar"].getComponent(Transform).scale.x = 0.95;
-    			this.render_players[ 0 ]["healthbar"].getComponent(Transform).position.x = 0;
-
-
-    			this.sounds["endgame"].playOnce();
-					
-    		}
-
-
-
-
-		} else if ( this.playerb2d.m_userData[4] > 0 ) {
-			// Player attacking .
-
-			
-			// Attacking tick at frame 20
-			if ( this.playerb2d.m_userData[4] == 20 ) {
-
-				this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Punch");
-
-				// at frame 10
-			} else if ( this.playerb2d.m_userData[4] == 10 ) {
-
-				let monb2d = this.playerb2d.m_userData[6];
-				if ( monb2d != null ) {	
-					// Player hit monster.	
-					this.sounds["swordhit"].playOnce();
-					this.monster_gethit( monb2d , this.playerb2d );
-					this.playerb2d.m_userData[6] = null;
-				}
-			}
-			this.playerb2d.m_userData[4] -= 1;
-			    	
-
-		} else {
-
-			let diffx = this.playerb2d.m_userData[5].x - this.playerb2d.GetPosition().x;
-			let diffz = this.playerb2d.m_userData[5].z - this.playerb2d.GetPosition().y;
-			let speed = 0.8;
-
-			let halftilesize = this.tilesize / 2;
-			
-			if ( diffx * diffx + diffz * diffz >= 0.15 * 0.15 ) {
-
-				let rad	 = Math.atan2( diffx, diffz );
-		    	let deg  = rad * 180.0 / Math.PI ;
-
-		    	let delta_x = speed  * Math.sin(rad);
-		    	let delta_z = speed  * Math.cos(rad);
-
-		    	this.playerb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
-
-
-		    	this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
-		    	this.playClip( this.render_players[ 0 ].getComponent(Animator) , "Walking");
-		    
-		    } else {
-		    	this.playClip( this.render_players[ 0 ].getComponent(Animator) , "_idle");
-		    	this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
-
-		    }
-		
-		}
+		this.update_player();
 
 	    this.vircam.x = this.playerb2d.GetPosition().x;
 		this.vircam.z = this.playerb2d.GetPosition().y;
@@ -284,20 +193,76 @@ export class Txstage extends Entity {
 	
 	}
 
+	//------------
+	monster_drop_loot( monb2d ) {
+
+		let x = monb2d.GetPosition().x;
+		let z = monb2d.GetPosition().y;
+		let rnd = Math.random();
+		
+		let additional_chance = 0;
+		if ( this.playerb2d.m_userData[8] * 2 < this.playerb2d.m_userData[9] ) {
+			additional_chance += 0.2;
+		}
+		
+		let pkbb2d = null;
+		if ( rnd < 0.05 ) {
+			pkbb2d = this.spawn_pickables( x , z , this.inv_and_stats.gen_random_weapon() );
+		
+		} else if ( rnd < 0.10 ) {
+			pkbb2d = this.spawn_pickables( x , z , this.inv_and_stats.gen_random_armor() );
+
+		} else if ( rnd < 0.20 ) {
+			
+			let money_amt = ( Math.random() * 30 ) >> 0 ;
+			pkbb2d = this.spawn_pickables( x, z , ["item_money", money_amt ] );
+			
+		} else if ( rnd < 0.30 + additional_chance ) {
+			pkbb2d = this.spawn_pickables( x , z , this.inv_and_stats.gen_random_potion() );
+		
+		}
+
+
+		if ( pkbb2d != null ) {
+
+			pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
+        	this.sounds["itemdrop"].playOnce() ;
+		}
+
+
+	}
+
 	//-----
 	player_gethit( playerb2d , monb2d ) {
 
-		let renderplayer_i = playerb2d.m_userData[3];
+		// Only get hit if still alive
+		if ( playerb2d.m_userData[10] == 0 ) {
+		
+			let renderplayer_i = playerb2d.m_userData[3];
 
-		playerb2d.m_userData[8] -= monb2d.m_userData[7];
-		if ( playerb2d.m_userData[8] <= 0 ) {
-			playerb2d.m_userData[8] = 0;
-			playerb2d.m_userData[10] = 120;
+			playerb2d.m_userData[8] -= monb2d.m_userData[7];
+			if ( playerb2d.m_userData[8] <= 0 ) {
+				playerb2d.m_userData[8] = 0;
+				playerb2d.m_userData[10] = 120;
+			}
+			if ( this.playerb2d.m_userData[8] * 3 < this.playerb2d.m_userData[9]  ) {
+				ui.displayAnnouncement('Warning: Low Health', 5, true, Color4.Red(), 20, false);
+			}
+
+			this.inv_and_stats.update_player_stats();
 		}
-		this.inv_and_stats.update_player_stats();
 	}
 
 
+
+	//---
+	player_stop_moving() {
+
+		this.playerb2d.m_userData[5].x = this.playerb2d.GetPosition().x;
+		this.playerb2d.m_userData[5].z = this.playerb2d.GetPosition().y;
+		this.playerb2d.SetLinearVelocity( new b2Vec2(0,0) );
+			
+	}
 
 
 	//--------
@@ -337,8 +302,43 @@ export class Txstage extends Entity {
 
 
 
+	//----------------------
+	pickable_onclick( renderpkb_i ) {
+		
+		let pkbb2d = this.render_pickables[renderpkb_i]["used_by"];
+		if ( pkbb2d != null ) {
+
+			if ( this.is_within_distance( pkbb2d, this.playerb2d, this.tilesize * 2 ) == 1 ) {
+				
+				this.cmd_stopmoving = 1;
+
+				if ( pkbb2d.m_userData[4][0] == "item_money" ) {
+
+					let amt = pkbb2d.m_userData[4][1];
+
+					ui.displayAnnouncement("+$" + amt,  5, true, Color4.Yellow(), 14, false);
 
 
+					this.inv_and_stats.player_stats["money"] += amt ;
+					this.inv_and_stats.update_player_stats();
+					this.sounds["goldcoin"].playOnce();
+					
+				} else {
+					this.inv_and_stats.inventories.push( pkbb2d.m_userData[4] );
+					this.inv_and_stats.update_inventory_2d_ui();
+					this.sounds["buttonclick"].playOnce();
+			
+				}
+			
+				let renderpkb_i = pkbb2d.m_userData[3];
+				pkbb2d.m_userData[2] = 0;
+				this.render_pickables[ renderpkb_i ]["used_by"] = null;
+				engine.removeEntity( this.render_pickables[ renderpkb_i ] );
+				this.world.DestroyBody( pkbb2d );
+				
+			}
+		}
+	}
 
 
 
@@ -459,13 +459,19 @@ export class Txstage extends Entity {
 	    	let distsqr_player	= diffx_player * diffx_player + diffy_player * diffy_player;
 
 	    	if ( distsqr_player <= hitrange * hitrange ) {
-	    		// hit player
+	    		
     			pjtb2d.m_userData[10] = 10;
-    			this.sounds["arrowhit"].playOnce();
+    			
     			
     			let owner = pjtb2d.m_userData[13];
-    			this.player_gethit( this.playerb2d , owner );
 
+    			let rnd = Math.random();
+    			// hit rate
+	    		if ( rnd < owner.m_userData[11] ) {
+	    			// hit player
+	    			this.sounds["arrowhit"].playOnce();
+	    			this.player_gethit( this.playerb2d , owner );
+	    		}
 
     		} else if ( distsqr > hitrange * hitrange  ) {
     			
@@ -485,6 +491,112 @@ export class Txstage extends Entity {
 		}	
 	}
 
+	//------
+	update_player() {
+
+		// p , , , , attacking, target_xy, target_mon, 
+
+		if ( this.playerb2d.m_userData[10] > 0 ) {
+
+			// Player dying..
+			this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Die");
+
+
+			if ( this.playerb2d.m_userData[10] == 120 ) {
+				ui.displayAnnouncement('You Died! You Lose Some Experience', 15, true, Color4.Red(), 50, false);
+				
+				this.npc_manager.end_all_npc_interactions();
+				this.sounds["scream"].playOnce();
+				this.inv_and_stats.lose_exp();
+			}
+
+
+    		if ( this.playerb2d.m_userData[10] > 1 ) {
+    			
+    			this.playerb2d.m_userData[10] -= 1;
+    		
+    		} else {
+    			
+    				
+    			let spawn_x = this.tilesize * -16;
+    			let spawn_z = this.tilesize * -19;
+
+    			// respawn player after die
+    			this.playerb2d.SetPosition( new b2Vec2( spawn_x, spawn_z ) );
+    			this.playerb2d.m_userData[8] = this.playerb2d.m_userData[9];
+    			this.playerb2d.m_userData[10] = 0;
+
+    			this.playerb2d.m_userData[5].x = this.playerb2d.GetPosition().x;
+				this.playerb2d.m_userData[5].z = this.playerb2d.GetPosition().y;
+
+
+    			this.render_players[ 0 ]["healthbar"].getComponent(Transform).scale.x = 0.95;
+    			this.render_players[ 0 ]["healthbar"].getComponent(Transform).position.x = 0;
+
+
+    			this.sounds["endgame"].playOnce();
+					
+    		}
+
+
+
+
+		} else if ( this.playerb2d.m_userData[4] > 0 ) {
+			// Player attacking .
+
+			
+			// Attacking tick at frame 20
+			if ( this.playerb2d.m_userData[4] == 20 ) {
+
+				this.playClip(this.render_players[ 0 ].getComponent(Animator) , "Punch");
+
+				// at frame 10
+			} else if ( this.playerb2d.m_userData[4] == 10 ) {
+
+				let monb2d = this.playerb2d.m_userData[6];
+				if ( monb2d != null ) {	
+					// Player hit monster.	
+					this.sounds["swordhit"].playOnce();
+					this.monster_gethit( monb2d , this.playerb2d );
+					this.playerb2d.m_userData[6] = null;
+				}
+			}
+			this.playerb2d.m_userData[4] -= 1;
+			    	
+
+		} else {
+
+			let diffx = this.playerb2d.m_userData[5].x - this.playerb2d.GetPosition().x;
+			let diffz = this.playerb2d.m_userData[5].z - this.playerb2d.GetPosition().y;
+			let speed = 1.2;
+
+			let halftilesize = this.tilesize / 2;
+			
+			if ( diffx * diffx + diffz * diffz >= 0.15 * 0.15 ) {
+
+				let rad	 = Math.atan2( diffx, diffz );
+		    	let deg  = rad * 180.0 / Math.PI ;
+
+		    	let delta_x = speed  * Math.sin(rad);
+		    	let delta_z = speed  * Math.cos(rad);
+
+		    	this.playerb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
+
+
+		    	this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+		    	this.playClip( this.render_players[ 0 ].getComponent(Animator) , "Walking");
+		    
+		    } else {
+		    	this.playClip( this.render_players[ 0 ].getComponent(Animator) , "_idle");
+		    	this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
+
+		    }
+		
+		}
+
+	}
+
+
     //-------------
     update_monster( monb2d , rendermon_i ) {
 
@@ -498,13 +610,21 @@ export class Txstage extends Entity {
 			this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Die");
 
 
+			// tick 80: the moment just died.
 			if ( monb2d.m_userData[10] == 80 ) {
+
 				if ( monb2d.m_userData[1] == 2 ) {
 					// Skeleton dies
     				this.sounds["skeletonhit"].playOnce();
     			} else {
     				this.sounds["goblinscream"].playOnce();
     			}
+    			this.monster_drop_loot( monb2d );
+
+
+    			let exp = this.get_monster_experience( monb2d.m_userData[1] );
+    			this.inv_and_stats.gain_exp( exp );
+
     		}    		
 
 
@@ -534,6 +654,8 @@ export class Txstage extends Entity {
     				
     				// Melee
 	    			let rnd = Math.random();
+
+	    			// hit rate
 	    			if ( rnd < monb2d.m_userData[11] ) {
 	    				// monster hit player.
 	    				this.sounds["punch"].playOnce();
@@ -553,7 +675,7 @@ export class Txstage extends Entity {
 	    	let range_aggro 		= this.tilesize * 6;
 	    	let range_attack		= this.get_monster_attack_range( monb2d.m_userData[1] );
 	    	
-	    	let speed = 0.6;
+	    	let speed = this.get_monster_speed( monb2d.m_userData[1]  );
 	    	let distsqr = diffx * diffx + diffz * diffz;
 
     		// Within aggro range
@@ -586,14 +708,29 @@ export class Txstage extends Entity {
 
     }
 
+
+    //-------
+    get_monster_speed( montype ) {
+    	let ret = 1.0;
+    	if ( montype == 1 || montype == 3 ) {
+    		ret = 1.0;
+    	} else if ( montype == 2 ) {
+    		ret = 0.8;
+    	}
+    	return ret;
+    }
+
+
     //----
     get_monster_attack_range( montype ) { 
     	
+    	let ret = this.tilesize * 0.6;
     	if ( montype == 3 ) {
-    		return this.tilesize * 5;
+    		ret = this.tilesize * 5;
     	} else { 
-    		return this.tilesize * 0.6;
+    		ret = this.tilesize * 0.6;
     	}
+    	return ret;
     }
 
     //-------
@@ -621,7 +758,17 @@ export class Txstage extends Entity {
     }
 
 
+    //---
+    get_monster_experience( montype )  {
 
+    	let ret = 50;
+    	if ( montype == 1 || montype == 3 ) {
+    		ret = 42;
+    	} else if ( montype == 2 ) {
+    		ret = 18;	
+    	}	
+    	return ret;
+    }
 
 
 
@@ -1163,21 +1310,26 @@ export class Txstage extends Entity {
 						return ;
 					}
 
-					let transform = this.getComponent(Transform);
-					this.playerb2d.m_userData[5].x = e.hit.hitPoint.x - transform.position.x + this.vircam.x ;
-					this.playerb2d.m_userData[5].z = e.hit.hitPoint.z - transform.position.z + this.vircam.z ;
+					if ( this.cmd_stopmoving == 1 ) {
+						this.player_stop_moving();
+						this.cmd_stopmoving = 0;
+					} else {
+						let transform = this.getComponent(Transform);
+						this.playerb2d.m_userData[5].x = e.hit.hitPoint.x - transform.position.x + this.vircam.x ;
+						this.playerb2d.m_userData[5].z = e.hit.hitPoint.z - transform.position.z + this.vircam.z ;
 
-					if ( this.playerb2d.m_userData[5].x < this.map_min.x * this.tilesize  ) {
-						this.playerb2d.m_userData[5].x = this.map_min.x * this.tilesize;
-					}
-					if ( this.playerb2d.m_userData[5].x > this.map_max.x * this.tilesize) {	
-						this.playerb2d.m_userData[5].x = this.map_max.x * this.tilesize;
-					}
-					if ( this.playerb2d.m_userData[5].z < this.map_min.z * this.tilesize) {
-						this.playerb2d.m_userData[5].z = this.map_min.z * this.tilesize;
-					}
-					if ( this.playerb2d.m_userData[5].z > this.map_max.z * this.tilesize) {	
-						this.playerb2d.m_userData[5].z = this.map_max.z * this.tilesize;
+						if ( this.playerb2d.m_userData[5].x < this.map_min.x * this.tilesize  ) {
+							this.playerb2d.m_userData[5].x = this.map_min.x * this.tilesize;
+						}
+						if ( this.playerb2d.m_userData[5].x > this.map_max.x * this.tilesize) {	
+							this.playerb2d.m_userData[5].x = this.map_max.x * this.tilesize;
+						}
+						if ( this.playerb2d.m_userData[5].z < this.map_min.z * this.tilesize) {
+							this.playerb2d.m_userData[5].z = this.map_min.z * this.tilesize;
+						}
+						if ( this.playerb2d.m_userData[5].z > this.map_max.z * this.tilesize) {	
+							this.playerb2d.m_userData[5].z = this.map_max.z * this.tilesize;
+						}
 					}	
 				}
 				 
@@ -1189,9 +1341,11 @@ export class Txstage extends Entity {
 
 		} else if ( e.buttonId == 2 ) {
 
-			
+			this.inv_and_stats.drink_from_inventory();
 		}
     }
+
+
 
 
 
@@ -1279,6 +1433,19 @@ export class Txstage extends Entity {
     	pickable.getComponent( BoxShape ).withCollisions = false;
     	pickable.addComponent( this.shared_pickable_mats["potion_health"] );
     	pickable["model"] = "potion_health";
+
+    	let pointer = new OnPointerDown(
+				(e) => {
+					this.pickable_onclick( pkbid ); 
+				},{
+					hoverText: "Pickup"
+				}
+			)
+
+		pickable.addComponent(pointer);
+			
+
+
     	this.render_pickables.push( pickable );
 		return this.render_pickables.length - 1;
 
@@ -1299,6 +1466,7 @@ export class Txstage extends Entity {
 		monster.getComponent( GLTFShape ).withCollisions = false;
 		monster["model"] = 2;
 		monster.addComponent( new Animator );
+		
 		let pointer = new OnPointerDown(
 				(e) => {
 					this.monster_onclick( monid ); 
@@ -1383,6 +1551,9 @@ export class Txstage extends Entity {
 			this.world, 
 			false 
     	);
+
+    	this.playerb2d.SetLinearDamping(10);
+
 		this.playerb2d.m_userData = ["p", 
 										0, 0,0,0, 
 										new Vector3(0,0,0),
@@ -1758,7 +1929,7 @@ export class Txstage extends Entity {
 		for ( texture in resources.textures ) {
 			
 			let texture_name_parts = texture.split("_");
-			if ( texture_name_parts[0] == "eqp" || texture_name_parts[0] == "potion" ) {
+			if ( texture_name_parts[0] == "eqp" || texture_name_parts[0] == "potion" || texture_name_parts[0] == "item" ) {
 				this.shared_pickable_mats[ texture ] = new Material();
 				this.shared_pickable_mats[ texture ].albedoTexture = resources.textures[texture];
 				this.shared_pickable_mats[ texture ].specularIntensity = 0;
@@ -1907,7 +2078,33 @@ export class Txstage extends Entity {
 		}
 		
 		this.init_monsters();
+		this.init_prizes() ;
 	}
+
+
+	//----
+	init_prizes() {
+
+		this.spawn_pickables( 1 , 1 , this.inv_and_stats.gen_random_armor() );
+		this.spawn_pickables( 1 , 1 , this.inv_and_stats.gen_random_weapon() );
+		this.spawn_pickables( 1 , 1 , this.inv_and_stats.gen_random_potion() );
+		
+		let coords = [ 
+			[-2,-1],
+			[-5,-4],
+			[-7,-8],
+			[ 1,-16]
+		];
+		
+		let i;	
+		for ( i = 0 ; i < coords.length ; i++ ) {
+			let rndamt = (Math.random() * 30) >> 0;
+			this.spawn_pickables(  coords[i][0] * this.tilesize , coords[i][1] * this.tilesize , ["item_money" , rndamt ] );
+		}
+
+						
+	}
+
 
 	//-----
 	init_surfaces_road() {
@@ -2191,14 +2388,16 @@ export class Txstage extends Entity {
 
 
 	//-------------
-	spawn_pickables( x , z, type  ) {
+	spawn_pickables( x , z,  inv_item  ) {
 
 		let pkbb2d = this.createDynamicBox( x , z , this.tilesize/4, this.tilesize/4 , this.world );
 
 		pkbb2d.SetLinearDamping(10);
 
 		// pjt  type  reg  renderpkb_i 
-		pkbb2d.m_userData = [ "pkb" ,  type , 0, -1  ];
+		pkbb2d.m_userData = [ "pkb" , inv_item[0] , 0, -1 , inv_item ];
+
+		return pkbb2d;
 
 	}
 
@@ -2217,6 +2416,8 @@ export class Txstage extends Entity {
 	
 
 		*/
+		monsterb2d.SetLinearDamping(10);
+    		
 
 		let attackduration = 20;
 		let dmg = this.get_monster_damage( type );
