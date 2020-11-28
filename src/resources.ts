@@ -14,10 +14,12 @@ export default {
 		goblinspear: new GLTFShape("models/goblinspear.glb"),
 		tombstone: new GLTFShape("models/tombstone.glb"),
 		cubeblock: new GLTFShape("models/cubeblock.glb"),
-		arrow: new GLTFShape("models/arrow.glb")
+		arrow: new GLTFShape("models/arrow.glb"),
+
+		generic_box: new BoxShape()
 	},
 
-	
+
 	textures: {
 		floor: new Texture("models/floor.png"),
 		surfacepatch: new Texture("models/surfacepatch.png"),

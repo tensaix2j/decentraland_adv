@@ -65,6 +65,8 @@ export class Txstage extends Entity {
 	public render_monsters 	= [];
 	public render_players 	= [];
 	public render_projectiles = [];
+	public render_pickables = [];
+
 
 
 
@@ -77,17 +79,22 @@ export class Txstage extends Entity {
 	
 
 
-	public sharedmats = [];
 	public movablefloor ;
 	public conversing = false;
 
 	public shared_billboard  = new Billboard();
 	public shared_planeshape = new PlaneShape();
+	public sharedmats = [];
+	public shared_pickable_mats = {};
+
+
 
 	public world;
 	public box2daabb;
 	public box2dcallback; 
 	public box2dcallback_pjt; 
+	public box2dcallback_pkb;
+
 	
 	public b2d_in_range = [];
 
@@ -129,7 +136,11 @@ export class Txstage extends Entity {
 
        	
         this.physicsCast = PhysicsCast.instance;
-			
+		
+		this.spawn_pickables( 1 , 1 , "potion_health" );
+		this.spawn_pickables( 1 , 1 , "eqp_iron_armor" );
+		this.spawn_pickables( 1 , 1 , "eqp_iron_pant" );
+		
 		
 	}	
 
@@ -443,7 +454,20 @@ export class Txstage extends Entity {
 	    	let hitrange = this.tilesize * 0.5;
 	    	let speed    = 3.5;
 
-    		if ( distsqr > hitrange * hitrange  ) {
+	    	let diffx_player 	= pjtb2d.GetPosition().x - this.playerb2d.GetPosition().x ;
+	    	let diffy_player 	= pjtb2d.GetPosition().y - this.playerb2d.GetPosition().y ;
+	    	let distsqr_player	= diffx_player * diffx_player + diffy_player * diffy_player;
+
+	    	if ( distsqr_player <= hitrange * hitrange ) {
+	    		// hit player
+    			pjtb2d.m_userData[10] = 10;
+    			this.sounds["arrowhit"].playOnce();
+    			
+    			let owner = pjtb2d.m_userData[13];
+    			this.player_gethit( this.playerb2d , owner );
+
+
+    		} else if ( distsqr > hitrange * hitrange  ) {
     			
     			var rad	 = Math.atan2( diffx, diffz );
 			    var deg  = rad * 180.0 / Math.PI ;
@@ -455,7 +479,7 @@ export class Txstage extends Entity {
 			    	
 
     		} else {
-    			// hit
+    			// hit nothing
     			pjtb2d.m_userData[10] = 10;
     		}
 		}	
@@ -503,7 +527,7 @@ export class Txstage extends Entity {
     			if ( monb2d.m_userData[1] == 3 ) {
     				
     				// Spear goblin creates projectile here.
-    				this.spawn_projectile( monb2d.GetPosition().x , monb2d.GetPosition().y , 1 , this.playerb2d.GetPosition().x, this.playerb2d.GetPosition().y );
+    				this.spawn_projectile( monb2d.GetPosition().x , monb2d.GetPosition().y , 1 , this.playerb2d.GetPosition().x, this.playerb2d.GetPosition().y , monb2d );
     				this.sounds["arrowshoot"].playOnce();
 
     			} else {
@@ -572,6 +596,38 @@ export class Txstage extends Entity {
     	}
     }
 
+    //-------
+    get_monster_hp( montype ) {
+
+    	let ret = 15;
+    	if ( montype == 1  || montype == 3) {
+    		ret = 25;
+    	} else if ( montype == 2 ) {
+    		ret = 10;
+    	}
+    	return ret;
+    }
+
+    //----
+    get_monster_damage( montype ) {
+
+    	let ret = 15;
+    	if ( montype == 1  || montype == 3) {
+    		ret = 2;
+    	} else if ( montype == 2 ) {
+    		ret = 1;
+    	}
+    	return ret;
+    }
+
+
+
+
+
+
+
+
+
 
 	//-----
 	find_monster_within_window() {
@@ -603,7 +659,19 @@ export class Txstage extends Entity {
 	
 	}
 
-	
+	//------
+	find_pickables_within_window( ) {
+
+		let search_range_x = this.tilesize * (this.xtilecnt / 2 >> 0) - this.tilesize ;
+		let search_range_z = this.tilesize * (this.ztilecnt / 2 >> 0) - this.tilesize ;
+
+		this.box2daabb.lowerBound = new b2Vec2( this.playerb2d.GetPosition().x - search_range_x  , this.playerb2d.GetPosition().y - search_range_z  );
+		this.box2daabb.upperBound = new b2Vec2( this.playerb2d.GetPosition().x + search_range_x  , this.playerb2d.GetPosition().y + search_range_z  );
+		
+		this.b2d_in_range.length = 0;
+		this.world.QueryAABB( this.box2dcallback_pkb , this.box2daabb);
+		
+	}
 
 
 	//-----------
@@ -807,7 +875,6 @@ export class Txstage extends Entity {
 
 				if ( renderpjt_i > -1 ) {
 
-					//this.readjust_projectile_model ( pjtb2d.m_userData , renderpjt_i );
 							
 					this.render_projectiles[ renderpjt_i ]["used_by"] = pjtb2d;
 					pjtb2d.m_userData[2] = 1;
@@ -833,6 +900,85 @@ export class Txstage extends Entity {
 			} 
 			
 		}
+
+
+
+
+
+		// Pickables
+		for ( i = 0 ; i < this.render_pickables.length ; i++ ) {
+			
+			if ( this.render_pickables[i]["used_by"] != null ) {
+				
+				let pkbb2d = this.render_pickables[i]["used_by"];
+				let pkb_x = pkbb2d.GetPosition().x ;
+				let pkb_z = pkbb2d.GetPosition().y ;
+
+				if ( 
+					( pkb_x < this.vircam.x - half_xtilecnt * this.tilesize ) ||
+					( pkb_x > this.vircam.x + half_xtilecnt * this.tilesize ) ||
+					( pkb_z < this.vircam.z - half_ztilecnt * this.tilesize ) ||
+					( pkb_z > this.vircam.z + half_ztilecnt * this.tilesize ) 
+				) {
+
+					pkbb2d.m_userData[2] = 0;
+					engine.removeEntity( this.render_pickables[ i ] );
+					//this.render_pickables[ i ].getComponent(Transform).position.y = -999;
+				 	this.render_pickables[ i ]["used_by"] = null;
+					
+				}
+			}   
+		}
+
+		
+		this.find_pickables_within_window();
+
+		for ( i = 0 ; i < this.b2d_in_range.length ; i++ ) {
+			
+			let pkbb2d = this.b2d_in_range[i];
+
+
+			// m, type, reg, renderpkb_i 
+			if ( pkbb2d.m_userData[2] == 0 ) {
+				
+				let renderpkb_i = this.get_unused_render_item_index( this.render_pickables ) ;
+				if ( renderpkb_i == -1 ) {
+					renderpkb_i = this.create_new_pickable_entity();
+					
+				} else {
+					engine.addEntity( this.render_pickables[ renderpkb_i ] );
+					
+				}
+
+				if ( renderpkb_i > -1 ) {
+
+					this.readjust_pickable_material ( pkbb2d.m_userData , renderpkb_i );
+							
+					this.render_pickables[ renderpkb_i ]["used_by"] = pkbb2d;
+					pkbb2d.m_userData[2] = 1;
+					pkbb2d.m_userData[3] = renderpkb_i;
+				}	
+
+			} else {
+
+				let renderpkb_i = pkbb2d.m_userData[3];
+				
+				
+				this.render_pickables[ renderpkb_i ].getComponent(Transform).position.x = pkbb2d.GetPosition().x - this.vircam.x; 
+				this.render_pickables[ renderpkb_i ].getComponent(Transform).position.z = pkbb2d.GetPosition().y - this.vircam.z; 
+
+				if ( pkbb2d.m_userData[10] > 0 ) {
+					// b2d Can be reused
+					this.render_pickables[ renderpkb_i ].getComponent(Transform).position.y = -999; 
+				} else {
+					this.render_pickables[ renderpkb_i ].getComponent(Transform).position.y = 0.5 ; 
+				}
+
+			} 
+			
+		}
+		
+
 
 
 
@@ -1117,6 +1263,27 @@ export class Txstage extends Entity {
 
     }
 
+    //---------------
+    create_new_pickable_entity() {
+    	
+    	let pickable = new Entity();
+    	let pkbid 	   = this.render_pickables.length;
+    	let size 	   = this.tilesize / 4;
+
+    	pickable.setParent( this );
+    	pickable.addComponent( new Transform({
+    		position: new Vector3(0, -999, 0 ),
+    		scale   : new Vector3( size , size, size )
+    	}));
+    	pickable.addComponent( resources.models.generic_box );
+    	pickable.getComponent( BoxShape ).withCollisions = false;
+    	pickable.addComponent( this.shared_pickable_mats["potion_health"] );
+    	pickable["model"] = "potion_health";
+    	this.render_pickables.push( pickable );
+		return this.render_pickables.length - 1;
+
+    }
+
 
     //----
     create_new_monster_entity() {
@@ -1382,6 +1549,17 @@ export class Txstage extends Entity {
 
     }
 
+    readjust_pickable_material ( pkbb2d_userdata , renderpkb_i ) {
+
+    	if (  pkbb2d_userdata[1] != this.render_pickables[ renderpkb_i ]["model"] ) {
+
+    		this.render_pickables[ renderpkb_i ].removeComponent( Material );
+    		this.render_pickables[ renderpkb_i ].addComponent( this.shared_pickable_mats[ pkbb2d_userdata[1] ] );
+    		this.render_pickables[ renderpkb_i ]["model"] = pkbb2d_userdata[1];
+    	}
+
+    }
+
 
     //-----------
     readjust_monster_model ( monb2d_userdata , rendermon_i ) {
@@ -1516,8 +1694,6 @@ export class Txstage extends Entity {
     }
 
 
-    dd
-
 
 
 
@@ -1578,6 +1754,18 @@ export class Txstage extends Entity {
 		sharedmat7.roughness = 1;
 		this.sharedmats.push( sharedmat7 );	
 
+		let texture;
+		for ( texture in resources.textures ) {
+			
+			let texture_name_parts = texture.split("_");
+			if ( texture_name_parts[0] == "eqp" || texture_name_parts[0] == "potion" ) {
+				this.shared_pickable_mats[ texture ] = new Material();
+				this.shared_pickable_mats[ texture ].albedoTexture = resources.textures[texture];
+				this.shared_pickable_mats[ texture ].specularIntensity = 0;
+				this.shared_pickable_mats[ texture ].roughness = 1;
+			}
+		}
+
 
 	}
 
@@ -1628,6 +1816,16 @@ export class Txstage extends Entity {
 		this.box2dcallback_pjt.ReportFixture = function( evt ) { 
 
 			if ( evt.m_body.m_userData != null && evt.m_body.m_userData[0] == "pjt" ) {
+				_this.b2d_in_range.push( evt.m_body );
+			}
+			return true;
+		};
+
+
+		this.box2dcallback_pkb = new b2QueryCallback();
+		this.box2dcallback_pkb.ReportFixture = function( evt ) { 
+
+			if ( evt.m_body.m_userData != null && evt.m_body.m_userData[0] == "pkb" ) {
 				_this.b2d_in_range.push( evt.m_body );
 			}
 			return true;
@@ -1808,7 +2006,7 @@ export class Txstage extends Entity {
 			[ 6 , 12 , 1 , 3  ],
 
 			// skele
-			//[ 12 , 6 , 2 , 2  ],
+			[ 12 , 6 , 2 , 2  ],
 			
 			[ 22 , 3 , 1 , 3  ],
 			[ 30 , 3 , 1 , 3  ],
@@ -1861,6 +2059,11 @@ export class Txstage extends Entity {
 				
 				let mx = cx + Math.random() * 0.5 - 0.25;
 				let mz = cz + Math.random() * 0.5 - 0.25;
+
+				if ( type == 1 && j >= 2 ) {
+					//Add some spear goblin to the pack
+					type = 3;
+				} 
 				this.spawn_monster( mx  * this.tilesize , mz  * this.tilesize  , type );
 			}
 		}
@@ -1967,15 +2170,38 @@ export class Txstage extends Entity {
 
 
 	//-------------
-	spawn_projectile( x , z, type , dst_x, dst_z ) {
+	spawn_projectile( x , z, type , dst_x, dst_z , owner_b2d ) {
 
 		let projectileb2d = this.createDynamicSensorCircle( x , z , this.tilesize/4 , this.world, 1 );
 
 		// pjt  type  reg  renderpjt_i , reserve, target_xz
-		projectileb2d.m_userData = [ "pjt" ,  type , 0, -1 , 0 , new Vector3(dst_x, 0 , dst_z ),0,0,0,0,0 ];
+		projectileb2d.m_userData = [ "pjt" ,  type , 0, -1 , 0 , new Vector3(dst_x, 0 , dst_z ),
+					0,   //6
+					0,   //7
+					0,   
+					0,
+					0,
+					0,
+					0,  
+					owner_b2d // 13. owner
+					 ];
 
 
 	}
+
+
+	//-------------
+	spawn_pickables( x , z, type  ) {
+
+		let pkbb2d = this.createDynamicBox( x , z , this.tilesize/4, this.tilesize/4 , this.world );
+
+		pkbb2d.SetLinearDamping(10);
+
+		// pjt  type  reg  renderpkb_i 
+		pkbb2d.m_userData = [ "pkb" ,  type , 0, -1  ];
+
+	}
+
 
 
 	//-----------
@@ -1993,7 +2219,9 @@ export class Txstage extends Entity {
 		*/
 
 		let attackduration = 20;
-		
+		let dmg = this.get_monster_damage( type );
+		let hp  = this.get_monster_hp( type );
+
 								// m  type  reg  rendermon_i , attacking,   reserve, reseve, damage, hp, maxhp
 		monsterb2d.m_userData = [ 
 								  "m", 
@@ -2005,9 +2233,9 @@ export class Txstage extends Entity {
 								  0,   //5.reserve  
 								  0,   //6. reserve    
 								  
-								  1,    //7.dmg  
-								  7,    //8.hp
-								  7,     //9.maxhp
+								  dmg,    //7.dmg  
+								  hp,    //8.hp
+								  hp,     //9.maxhp
 								  0,     //10. dying tick
 								  0.5, 	//11. hitrate	
 								  attackduration    //12. attackduration
@@ -2088,9 +2316,9 @@ export class Txstage extends Entity {
         bodyDef.type 	= body_type;
 		
         let fixDef          = new b2FixtureDef();
-        fixDef.density      = 1.0;
-        fixDef.friction     = 0.00;
-        fixDef.restitution  = 0.1;
+        fixDef.density      = 10.0;
+        fixDef.friction     = 1;
+        fixDef.restitution  = 0.0;
         fixDef.shape        = new b2PolygonShape();
         fixDef.shape.SetAsBox( width/2 , height/2 );
 
