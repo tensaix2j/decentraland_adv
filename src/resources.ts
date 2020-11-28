@@ -30,6 +30,13 @@ export default {
 		selectedslot: new Texture("models/selectedslot.png"),
 		equippedslot: new Texture("models/equippedslot.png"),
 
+		eqp_wooden_sword: new Texture("models/woodensword.png"),
+		eqp_wooden_shield: new Texture("models/woodenshield.png"),
+		eqp_wooden_helmet: new Texture("models/woodenhelmet.png"),
+		eqp_wooden_armor: new Texture("models/woodenarmor.png"),
+		eqp_wooden_pant: new Texture("models/woodenpant.png"),
+		eqp_wooden_boot: new Texture("models/woodenboot.png"),
+
 		eqp_bronze_sword: new Texture("models/bronzesword.png"),
 		eqp_bronze_shield: new Texture("models/bronzeshield.png"),
 		eqp_bronze_helmet: new Texture("models/bronzehelmet.png"),
@@ -49,7 +56,8 @@ export default {
 		item_money: new Texture("models/itemmoney.png"),
 
 		uiframe: new Texture("models/uiframe.png"),
-		uiframesmall: new Texture("models/uiframesmall.png")
+		uiframesmall: new Texture("models/uiframesmall.png"),
+		explosion: new Texture("models/explosion.png")
 
 	},
 	sounds: {

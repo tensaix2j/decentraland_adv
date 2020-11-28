@@ -82,9 +82,9 @@ export class Txinv_and_stats extends Entity {
 
 	//-----------------------
 	public armor_parts  =  ["helmet","armor","pant","boot"];
-	public armor_mats   =  ["bronze","iron"];
+	public armor_mats   =  ["wooden","bronze","iron"];
 	public weapon_parts =  ["sword"];
-	public weapon_mats  =  ["bronze","iron"];
+	public weapon_mats  =  ["wooden","bronze","iron"];
 
 	visit_shop( shop_id ) {
 
@@ -115,7 +115,19 @@ export class Txinv_and_stats extends Entity {
 		
 		let armor_partid = this.random_int( this.armor_parts.length ); 
 		let armor_part   = this.armor_parts[armor_partid] ;
-		let armor_matid  = this.random_int( this.armor_mats.length );
+
+			
+		//let armor_matid  = this.random_int( this.armor_mats.length );
+			
+		let armor_matid = 0;
+		let rnd = Math.random();
+		if ( rnd < 0.15 ) {
+			armor_matid = 2;
+		} else if ( rnd < 0.5 ) {
+			armor_matid = 1
+		}
+
+
 		let armor_mat 	 = this.armor_mats[armor_matid]; 
 
 		let cost = armor_matid * 1000 + 500;	
@@ -143,7 +155,17 @@ export class Txinv_and_stats extends Entity {
 		let j;
 		let weapon_partid = this.random_int( this.weapon_parts.length ); 
 		let weapon_part   = this.weapon_parts[weapon_partid] ;
-		let weapon_matid  = this.random_int( this.weapon_mats.length );
+		
+
+		//let weapon_matid  = this.random_int( this.weapon_mats.length );
+		let weapon_matid = 0;
+		let rnd = Math.random();
+		if ( rnd < 0.15 ) {
+			weapon_matid = 2;
+		} else if ( rnd < 0.5 ) {
+			weapon_matid = 1
+		}
+
 		let weapon_mat 	 = this.weapon_mats[weapon_matid]; 
 
 		let cost = weapon_matid * 1000 + 500;	
@@ -263,6 +285,7 @@ export class Txinv_and_stats extends Entity {
 			this.stage.playerb2d.m_userData[8] = this.stage.playerb2d.m_userData[9];
 		}
 		this.stage.sounds["drink"].playOnce();
+		this.update_player_stats();
 	}
 
 	//----------
@@ -590,7 +613,7 @@ export class Txinv_and_stats extends Entity {
 		inventory_selected_item_but_use.hAlign = "left";
 		inventory_selected_item_but_use.sourceWidth = 64;
 		inventory_selected_item_but_use.sourceHeight = 64;
-		inventory_selected_item_but_use.width = 50;
+		inventory_selected_item_but_use.width = 80;
 		inventory_selected_item_but_use.height = 20;
 		inventory_selected_item_but_use.positionX = 10;	
 		inventory_selected_item_but_use.positionY = 10;	
@@ -602,7 +625,7 @@ export class Txinv_and_stats extends Entity {
 		let inventory_selected_item_but_use_caption = new UIText( inventory_selected_item_but_use );
 		inventory_selected_item_but_use_caption.value = "USE";
 		inventory_selected_item_but_use_caption.vAlign = "top";
-		inventory_selected_item_but_use_caption.hAlign = "left";
+		inventory_selected_item_but_use_caption.hAlign = "center";
 		inventory_selected_item_but_use_caption.positionY = 33;
 		inventory_selected_item_but_use_caption.positionX = 14;
 		inventory_selected_item_but_use_caption.isPointerBlocker = false;
@@ -618,7 +641,7 @@ export class Txinv_and_stats extends Entity {
 		inventory_selected_item_but_throw.sourceHeight = 64;
 		inventory_selected_item_but_throw.width = 50;
 		inventory_selected_item_but_throw.height = 20;
-		inventory_selected_item_but_throw.positionX = 70;	
+		inventory_selected_item_but_throw.positionX = 90;	
 		inventory_selected_item_but_throw.positionY = 10;	
 		inventory_selected_item_but_throw.onClick = new OnClick(() => {
 			this.button_onclick( "selected_item_throw" );
@@ -643,7 +666,7 @@ export class Txinv_and_stats extends Entity {
 		inventory_selected_item_but_sell.sourceHeight = 64;
 		inventory_selected_item_but_sell.width = 50;
 		inventory_selected_item_but_sell.height = 20;
-		inventory_selected_item_but_sell.positionX = 130;	
+		inventory_selected_item_but_sell.positionX = 140;	
 		inventory_selected_item_but_sell.positionY = 10;	
 		inventory_selected_item_but_sell.visible = false;
 		inventory_selected_item_but_sell.onClick = new OnClick(() => {
@@ -1055,7 +1078,7 @@ export class Txinv_and_stats extends Entity {
 
 
 
-		this.player_stats_caption.value += "HP : "   + this.stage.playerb2d.m_userData[8]   +  " / "  + this.player_derived_stats[10] + "\n";
+		this.player_stats_caption.value += "HP : "   + this.stage.playerb2d.m_userData[8].toFixed(0)   +  " / "  + this.player_derived_stats[10] + "\n";
 		this.player_stats_caption.value += "Mana : " + this.stage.playerb2d.m_userData[14] +  " / "+ this.player_derived_stats[11] + "\n";
 
 		this.player_stats_caption.value += "\n"
@@ -1199,11 +1222,11 @@ export class Txinv_and_stats extends Entity {
 				let eqp_position = this.get_equipped_position( item_type_parts[2] );
 				if ( this.player_equipped[ eqp_position ] == item ) {
 					
-					this.inventory_selected_item_but_use_caption.value = "UNEQP";
+					this.inventory_selected_item_but_use_caption.value = "UNEQUIP";
 
 
 				} else {
-					this.inventory_selected_item_but_use_caption.value = "EQP";
+					this.inventory_selected_item_but_use_caption.value = "EQUIP";
 				}
 			} else {
 				this.inventory_selected_item_but_use_caption.value = "USE";
