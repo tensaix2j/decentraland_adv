@@ -15,8 +15,10 @@ export default {
 		tombstone: new GLTFShape("models/tombstone.glb"),
 		cubeblock: new GLTFShape("models/cubeblock.glb"),
 		arrow: new GLTFShape("models/arrow.glb"),
-
-		generic_box: new BoxShape()
+		bone: new GLTFShape("models/bone.glb"),
+		generic_box: new BoxShape(),
+		fireball: new GLTFShape("models/fireball.glb"),
+		darkwizard: new GLTFShape("models/darkwizard.glb")
 	},
 
 
@@ -88,7 +90,9 @@ export default {
 		drink:new AudioClip("sounds/drink.mp3"),
 		itemdrop: new AudioClip("sounds/itemdrop.mp3"),
 		levelup: new AudioClip("sounds/levelup.mp3"),
-		goldcoin: new AudioClip("sounds/goldcoin.mp3")
+		goldcoin: new AudioClip("sounds/goldcoin.mp3"),
+		explosion2: new AudioClip("sounds/explosion2.mp3"),
+		ambient: new AudioClip("sounds/ambient.mp3")
 	}
 
 

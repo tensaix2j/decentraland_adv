@@ -1180,10 +1180,11 @@ export class Txinv_and_stats extends Entity {
 		if ( this.stage.playerb2d.GetPosition().y < 0 ) {
 			halfz = -halfz;
 		}	
-		let player_tile_x = ( this.stage.playerb2d.GetPosition().x + halfx / this.stage.tilesize ) >> 0 ;
-		let player_tile_z = ( this.stage.playerb2d.GetPosition().y + halfz / this.stage.tilesize ) >> 0 ;
+		let player_tile_x = ( (this.stage.playerb2d.GetPosition().x + halfx) / this.stage.tilesize ) >> 0 ;
+		let player_tile_z = ( (this.stage.playerb2d.GetPosition().y + halfz) / this.stage.tilesize ) >> 0 ;
 			
-		this.virpos_caption.value = player_tile_x + ","  + player_tile_z ;
+		this.virpos_caption.value = player_tile_x + ","  + player_tile_z  ;
+		
 		this.tick += 1 ;
 
 	}

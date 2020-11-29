@@ -24,11 +24,12 @@ import resources from "src/resources";
 import {Utils} from "src/utils"
 import { getUserAccount, RPCSendableMessage  } from '@decentraland/EthereumController'
 import { Txsound } from "src/txsound";
-import { Perlin } from "src/perlin";
 
 
 import { Txinv_and_stats } from "src/txinv_and_stats"
 import { Txnpc_manager   } from "src/txnpc_manager"
+import { Txmap_manager   } from "src/txmap_manager"
+
 
 
 export class Txstage extends Entity {
@@ -50,14 +51,7 @@ export class Txstage extends Entity {
 	public ztilecnt = 19;
 
 
-
-
-	public perlin;
-
-	public map_min = new Vector3(-40, 0, -40);
-	public map_max = new Vector3( 40, 0,  80);
-
-
+	
 
 	// These holds entities to be put in window
 	public render_objects 	= [];
@@ -107,12 +101,15 @@ export class Txstage extends Entity {
 
 	public inv_and_stats ;
 	public npc_manager;
+	public map_manager;
 
 	public mousedown = 0;
 	public physicsCast;
 
 	public cmd_stopmoving = 0;
+	public b2d_clicked = null;
 
+	public debugsetting = 1;
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -133,17 +130,28 @@ export class Txstage extends Entity {
 		this.prepare_inputs();
 
 		
-        this.perlin = new Perlin();
         this.inv_and_stats = new Txinv_and_stats( this );
         this.npc_manager   = new Txnpc_manager( this );
+        this.map_manager   = new Txmap_manager( this );
+
+
         this.npc_manager.create_npcs();
         this.physicsCast = PhysicsCast.instance;
 		
-		
-		this.init_maps();
+			
+		this.map_manager.init_maps();
         this.init_sound();
+        
+        this.sounds["ambient"].playLoop();
+
+        if ( this.debugsetting == 1) {
+        	let x = -33 * this.tilesize;
+        	let z = -33 * this.tilesize;
+        	this.playerb2d.SetPosition( new b2Vec2( x,z ) );
+        	this.playerb2d.m_userData[5].x =  x;
+        	this.playerb2d.m_userData[5].z =  z;
         	
-		
+		}		
 	}	
 
 	//------
@@ -388,6 +396,8 @@ export class Txstage extends Entity {
 			    	
 			    }		
 			}
+			this.b2d_clicked = monb2d;
+
 		}
 			
 	}
@@ -439,10 +449,14 @@ export class Txstage extends Entity {
 	playClip( animator , clipname ) {
 
 		animator.getClip("Punch").playing 		= false;
+		animator.getClip("Punch").looping 		= false;
+		
 		animator.getClip("Die").playing 		= false;
 		animator.getClip("Die").looping 		= false
 
 		animator.getClip("_idle").playing 		= false;
+		animator.getClip("_idle").looping 		= false;
+		
 		animator.getClip("Walking").playing 	= false;
 		animator.getClip(clipname).playing 		= true;
 	}
@@ -450,25 +464,28 @@ export class Txstage extends Entity {
 
 
 	//-------------------------------------
-	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 , 0 , 1, 2,  3 ];
-	public frame_index_to_frame_y = [ 3 , 3, 3, 3,    2, 2, 2, 2,   1, 1, 1, 1 , 0 , 0 , 0 , 0];
-
+	
 
 	update_explosion( explb2d , renderexpl_i ) {
 
 		if ( explb2d.m_userData[10] > 0 ) {
-            // Dying ticks 
-            if ( explb2d.m_userData[10] > 1 ) {
-                explb2d.m_userData[10] -= 1;
-            } else {
-                this.world.DestroyBody( explb2d );
-            }
+
+            explb2d.m_userData[2] = 0;
+			engine.removeEntity( this.render_explosions[ renderexpl_i ] );
+			this.render_explosions[ renderexpl_i ]["used_by"] = null;
+			this.world.DestroyBody( explb2d );
+
+
         } else {
 
         	if ( explb2d.m_userData[4] < 16 ) {
         		
         		if ( explb2d.m_userData[4] == 0 ) {
-        			this.sounds["explosion"].playOnce();
+        			if ( explb2d.m_userData[1] == 2 ) {
+        				this.sounds["explosion2"].playOnce();
+        			} else {
+        				this.sounds["explosion"].playOnce();
+        			}
         		}
 
         		let cur_frame = explb2d.m_userData[4] 
@@ -498,39 +515,57 @@ export class Txstage extends Entity {
 	update_projectile( pjtb2d , renderpjt_i ) {
 		
 		if ( pjtb2d.m_userData[10] > 0 ) {
-			// Dying ticks 
-			if ( pjtb2d.m_userData[10] > 1 ) {
-    			pjtb2d.m_userData[10] -= 1;
-    		} else {
-    			this.world.DestroyBody( pjtb2d );
-    		}
+			
+			if ( pjtb2d.m_userData[1] == 2 ) {
+				// is bone..
+				this.spawn_explosion( pjtb2d.GetPosition().x, pjtb2d.GetPosition().y , 2 , pjtb2d.m_userData[13] ) ;
+
+
+			} else if ( pjtb2d.m_userData[1] == 3 ) {
+			
+				// is fireball..
+				this.spawn_explosion( pjtb2d.GetPosition().x, pjtb2d.GetPosition().y , 1 , pjtb2d.m_userData[13] ) ;
+			}
+
+			pjtb2d.m_userData[2] = 0;
+			engine.removeEntity( this.render_projectiles[ renderpjt_i ] );
+			this.render_projectiles[ renderpjt_i ]["used_by"] = null;
+			this.world.DestroyBody( pjtb2d );
+
+    		
 		} else {
 
 			let diffx = pjtb2d.m_userData[5].x - pjtb2d.GetPosition().x ;
 	    	let diffz = pjtb2d.m_userData[5].z - pjtb2d.GetPosition().y ;
+	    	let diffy = pjtb2d.m_userData[5].y - pjtb2d.m_userData[6];
 
 	    	let distsqr = diffx * diffx + diffz * diffz;
 	    	let hitrange = this.tilesize * 0.5;
-	    	let speed    = 3.5;
+	    	let speed    = this.get_projectile_speed( pjtb2d.m_userData[1] );
 
 	    	let diffx_player 	= pjtb2d.GetPosition().x - this.playerb2d.GetPosition().x ;
-	    	let diffy_player 	= pjtb2d.GetPosition().y - this.playerb2d.GetPosition().y ;
-	    	let distsqr_player	= diffx_player * diffx_player + diffy_player * diffy_player;
+	    	let diffz_player 	= pjtb2d.GetPosition().y - this.playerb2d.GetPosition().y ;
+	    	let distsqr_player	= diffx_player * diffx_player + diffz_player * diffz_player;
 
 	    	if ( distsqr_player <= hitrange * hitrange ) {
 	    		
-    			pjtb2d.m_userData[10] = 10;
+	    		let owner = pjtb2d.m_userData[13];
+	    		pjtb2d.m_userData[10] = 10;
     			
-    			
-    			let owner = pjtb2d.m_userData[13];
+    			if ( pjtb2d.m_userData[1] == 2 || pjtb2d.m_userData[1] == 3 ) {
 
-    			let rnd = Math.random();
-    			// hit rate
-	    		if ( rnd < owner.m_userData[11] ) {
-	    			// hit player
-	    			this.sounds["arrowhit"].playOnce();
-	    			this.player_gethit( this.playerb2d , owner );
-	    		}
+    				// Bone or fire ball no need to check hitrate.
+    				this.player_gethit( this.playerb2d , owner );
+
+    			} else {
+	    			let rnd = Math.random();
+	    			// hit rate
+		    		if ( rnd < owner.m_userData[11] ) {
+		    			// hit player
+		    			this.sounds["arrowhit"].playOnce();
+		    			this.player_gethit( this.playerb2d , owner );
+		    		}
+		    	}
 
     		} else if ( distsqr > hitrange * hitrange  ) {
     			
@@ -538,10 +573,22 @@ export class Txstage extends Entity {
 			    var deg  = rad * 180.0 / Math.PI ;
 			    var delta_x = speed * Math.sin(rad);
 			    var delta_z = speed * Math.cos(rad);
-
+			    
 			    pjtb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
-			    this.render_projectiles[ renderpjt_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
-			    	
+
+
+			    
+			    if ( pjtb2d.m_userData[1] == 2 || pjtb2d.m_userData[1] == 3 ) {
+			    	// Need adjust high to low
+			    	var delta_y = diffy / 20;
+				    pjtb2d.m_userData[6] += delta_y;
+				}
+
+				if (  pjtb2d.m_userData[1] == 2  ) { 
+					this.render_projectiles[ renderpjt_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( Math.random() * 90  , deg , Math.random() * 90 );
+				} else {
+			    	this.render_projectiles[ renderpjt_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+			    }
 
     		} else {
     			// hit nothing
@@ -564,6 +611,7 @@ export class Txstage extends Entity {
 			if ( this.playerb2d.m_userData[10] == 120 ) {
 				ui.displayAnnouncement('You Died! You Lose Some Experience', 15, true, Color4.Red(), 50, false);
 				
+				
 				this.npc_manager.end_all_npc_interactions();
 				this.sounds["scream"].playOnce();
 				this.inv_and_stats.lose_exp();
@@ -580,6 +628,8 @@ export class Txstage extends Entity {
     			let spawn_x = this.tilesize * -16;
     			let spawn_z = this.tilesize * -19;
 
+    			
+
     			// respawn player after die
     			this.playerb2d.SetPosition( new b2Vec2( spawn_x, spawn_z ) );
     			this.playerb2d.m_userData[8] = this.playerb2d.m_userData[9];
@@ -594,7 +644,8 @@ export class Txstage extends Entity {
 
 
     			this.sounds["endgame"].playOnce();
-					
+				this.inv_and_stats.update_player_stats();
+	
     		}
 
 
@@ -656,36 +707,31 @@ export class Txstage extends Entity {
 	}
 
 
-    //-------------
-    update_monster( monb2d , rendermon_i ) {
 
-    	let i;
+	//-------------
+	update_monster_boss( monb2d , rendermon_i ) {
 
-	    // m,  type ,   reg,   rendermon_i, attacking, , , ,dmg,hp,maxhp, dying
-    	
+		let i,j;
 
-    	if ( monb2d.m_userData[10] > 0 ) {
+		if ( monb2d.m_userData[10] > 0 ) {
+    		
     		// Dying ticks
 			this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Die");
-
 
 			// tick 80: the moment just died.
 			if ( monb2d.m_userData[10] == 80 ) {
 
-				if ( monb2d.m_userData[1] == 2 ) {
-					// Skeleton dies
-    				this.sounds["skeletonhit"].playOnce();
-    			} else {
-    				this.sounds["goblinscream"].playOnce();
-    			}
-    			this.monster_drop_loot( monb2d );
+				if ( monb2d.m_userData[1] == 12 ) {
+					this.sounds["skeletonhit"].playOnce();
+				} else {
+					this.sounds["organicdie"].playOnce();
+				}
 
+    			this.monster_drop_loot( monb2d );
 
     			let exp = this.get_monster_experience( monb2d.m_userData[1] );
     			this.inv_and_stats.gain_exp( exp );
-
     		}    		
-
 
     		if ( monb2d.m_userData[10] > 1 ) {
     			monb2d.m_userData[10] -= 1;
@@ -702,18 +748,43 @@ export class Txstage extends Entity {
     		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Punch");
     		
     		if ( monb2d.m_userData[4] == monb2d.m_userData[12] - 10 ) {
-    			
-    			if ( monb2d.m_userData[1] == 3 ) {
-    				
-    				// Spear goblin creates projectile here.
-    				this.spawn_projectile( monb2d.GetPosition().x , monb2d.GetPosition().y , 1 , this.playerb2d.GetPosition().x, this.playerb2d.GetPosition().y , monb2d );
-    				this.sounds["arrowshoot"].playOnce();
+    					
+    			// Use Range
+				if ( monb2d.m_userData[5] == 1 ) {
 
-    			} else {
-    				
-    				// Melee
+					if ( monb2d.m_userData[1] == 13 ) {  
+						
+						// Need multiple shots. 
+						for ( j = -2 ; j <= 2 ; j++ ) {
+							let new_target = this.add_angle_to_target( monb2d, this.playerb2d  , j * 15 * Math.PI / 180.0 );
+							this.spawn_projectile( monb2d.GetPosition().x , 1.0,  monb2d.GetPosition().y ,  3 ,  new_target.x , 0.5 ,  new_target.z , monb2d );
+							this.sounds["whoosh"].playOnce();
+						}
+
+					} else if ( monb2d.m_userData[1] == 12 ) {
+
+						// Need multiple shots
+						for ( j = -1 ; j <= 1 ; j++ ) {
+
+							let new_target = this.add_angle_to_target( monb2d, this.playerb2d  , j * 35 * Math.PI / 180.0 );
+							this.spawn_projectile( monb2d.GetPosition().x ,   2,  monb2d.GetPosition().y ,  2 , new_target.x , 0.5 , new_target.z , monb2d );
+							
+							this.sounds["skeletonhit"].playOnce();
+						}
+					}
+
+					monb2d.m_userData[6] += 1;
+			    	if ( monb2d.m_userData[6] > 10 ) {
+			    		monb2d.m_userData[5] = ( monb2d.m_userData[5] + 1 ) % 2;
+			    		monb2d.m_userData[6] = 0;
+			    	}
+
+
+    			// Use melee
+				} else if ( monb2d.m_userData[5] == 0 ) {
+
+					// Melee
 	    			let rnd = Math.random();
-
 	    			// hit rate
 	    			if ( rnd < monb2d.m_userData[11] ) {
 	    				// monster hit player.
@@ -722,18 +793,29 @@ export class Txstage extends Entity {
 	    			} else {
 	    				this.sounds["growl"].playOnce();
 	    			}
-	    		}
+				}
+
     		}
 
 
     	} else {
 
+
     		let diffx = this.playerb2d.GetPosition().x - monb2d.GetPosition().x ;
 	    	let diffz = this.playerb2d.GetPosition().y - monb2d.GetPosition().y  ;
 
-	    	let range_aggro 		= this.tilesize * 6;
-	    	let range_attack		= this.get_monster_attack_range( monb2d.m_userData[1] );
-	    	
+	    	let range_aggro 	= this.tilesize * 7;
+
+
+	    	let range_attack_melee	= this.tilesize * 0.8;
+	    	let range_attack_range	= this.tilesize * 6;
+
+
+	    	let range_attack = range_attack_range;
+			if ( monb2d.m_userData[5] == 0 ) {
+		    	range_attack =  range_attack_melee;	
+		    }   	
+
 	    	let speed = this.get_monster_speed( monb2d.m_userData[1]  );
 	    	let distsqr = diffx * diffx + diffz * diffz;
 
@@ -743,35 +825,209 @@ export class Txstage extends Entity {
 	    		var rad	 = Math.atan2( diffx, diffz );
 			    var deg  = rad * 180.0 / Math.PI ;
 			    this.render_monsters[ rendermon_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
-			    		
-	    		// Within attack range
-		    	if ( distsqr > range_attack * range_attack ) {
+			    
 
+
+	    		// Within melee attack range
+		    	if ( distsqr <= range_attack * range_attack ) {
+
+		    		// Init  attack.
+		    		monb2d.SetLinearVelocity( new b2Vec2( 0 , 0 ) );
+			    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
+			    	monb2d.m_userData[4] = monb2d.m_userData[12] ;
+			  		
+		    	} else {	
+		    		// Move closer
 		    		var delta_x = speed * Math.sin(rad);
 			    	var delta_z = speed * Math.cos(rad);
 
 			    	monb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
-
 			    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Walking");
 
+			    	if ( monb2d.m_userData[1] == 13 && monb2d.m_userData[5] == 0 ) {
+			    		// 13 wont use melee 	
+			    		 monb2d.m_userData[5] = 1;
 
-			    } else {
-			    	// Init attack.
-			    	monb2d.SetLinearVelocity( new b2Vec2( 0 , 0 ) );
-			    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
-			    	monb2d.m_userData[4] = monb2d.m_userData[12] ;
-			    	 
-			    }
+			    	} else {
+				    	monb2d.m_userData[6] += 1;
+				    	if ( monb2d.m_userData[6] > 5 * 30 ) {
+				    		monb2d.m_userData[5] = ( monb2d.m_userData[5] + 1 ) % 2;
+				    		monb2d.m_userData[6] = 0;
+				    	}
+			    	}
+
+			    } 
 			} 
 		}
+	}	
 
+
+	//-------------------
+	add_angle_to_target( selfb2d, targetb2d , angle ) {
+
+		let diffx = targetb2d.GetPosition().x - selfb2d.GetPosition().x ;
+	    let diffz = targetb2d.GetPosition().y - selfb2d.GetPosition().y  ;
+
+	    let dist = Math.sqrt( diffx * diffx + diffz * diffz );
+	    let rad	 = Math.atan2( diffx, diffz );
+		
+		let new_x = selfb2d.GetPosition().x + ( dist * Math.sin(rad + angle) ); 
+		let new_z = selfb2d.GetPosition().y + ( dist * Math.cos(rad + angle) );
+
+		return new Vector3(new_x, 0 , new_z );
+	}
+
+
+
+
+
+
+
+    //-------------
+    update_monster( monb2d , rendermon_i ) {
+
+    	let i;
+
+	    // m,  type ,   reg,   rendermon_i, attacking, , , ,dmg,hp,maxhp, dying
+    	if ( monb2d.m_userData[1] == 12 || monb2d.m_userData[1] == 13) {
+    		this.update_monster_boss( monb2d , rendermon_i );
+
+    	} else {
+
+	    	if ( monb2d.m_userData[10] > 0 ) {
+	    		// Dying ticks
+				this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Die");
+
+				// tick 80: the moment just died.
+				if ( monb2d.m_userData[10] == 80 ) {
+
+					if ( monb2d.m_userData[1] == 2 ) {
+						// Skeleton dies
+	    				this.sounds["skeletonhit"].playOnce();
+	    			} else {
+	    				this.sounds["goblinscream"].playOnce();
+	    			}
+	    			this.monster_drop_loot( monb2d );
+
+	    			let exp = this.get_monster_experience( monb2d.m_userData[1] );
+	    			this.inv_and_stats.gain_exp( exp );
+	    		}    		
+
+	    		if ( monb2d.m_userData[10] > 1 ) {
+	    			monb2d.m_userData[10] -= 1;
+	    		} else {
+	    			this.world.DestroyBody( monb2d );
+	    		}
+
+
+	    	} else if ( monb2d.m_userData[4] > 0 ) {
+
+	    		// Attacking ticks
+	    		monb2d.m_userData[4] -= 1;
+
+	    		this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Punch");
+	    		
+	    		if ( monb2d.m_userData[4] == monb2d.m_userData[12] - 10 ) {
+	    			
+	    			if ( monb2d.m_userData[1] == 3 ) {
+	    				
+	    				// Spear goblin creates projectile here.
+	    				this.spawn_projectile( monb2d.GetPosition().x , 0.5, monb2d.GetPosition().y , 1 , this.playerb2d.GetPosition().x, 0.5, this.playerb2d.GetPosition().y , monb2d );
+	    				this.sounds["arrowshoot"].playOnce();
+
+
+	    			} else if ( monb2d.m_userData[1] == 4 ) {
+	    					
+	    				// Dark wizard creates projectile here.
+	    				this.spawn_projectile( monb2d.GetPosition().x , 0.5, monb2d.GetPosition().y , 3 , this.playerb2d.GetPosition().x, 0.5, this.playerb2d.GetPosition().y , monb2d );
+	    				this.sounds["whoosh"].playOnce();
+						
+
+					} else {
+	    				
+	    				// Melee
+		    			let rnd = Math.random();
+
+		    			// hit rate
+		    			if ( rnd < monb2d.m_userData[11] ) {
+		    				// monster hit player.
+		    				this.sounds["punch"].playOnce();
+		    				this.player_gethit( this.playerb2d , monb2d );
+		    			} else {
+		    				this.sounds["growl"].playOnce();
+		    			}
+		    		}
+	    		}
+
+
+	    	} else {
+
+
+	    		let diffx = this.playerb2d.GetPosition().x - monb2d.GetPosition().x ;
+		    	let diffz = this.playerb2d.GetPosition().y - monb2d.GetPosition().y  ;
+
+		    	let range_aggro 		= this.tilesize * 6;
+		    	let range_attack		= this.get_monster_attack_range( monb2d.m_userData[1] );
+		    	
+		    	let speed = this.get_monster_speed( monb2d.m_userData[1]  );
+		    	let distsqr = diffx * diffx + diffz * diffz;
+
+	    		// Within aggro range
+		    	if ( distsqr < range_aggro * range_aggro && this.playerb2d.m_userData[10] == 0 ) {
+
+		    		var rad	 = Math.atan2( diffx, diffz );
+				    var deg  = rad * 180.0 / Math.PI ;
+				    this.render_monsters[ rendermon_i ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
+				    		
+		    		// Within attack range
+			    	if ( distsqr > range_attack * range_attack ) {
+
+			    		var delta_x = speed * Math.sin(rad);
+				    	var delta_z = speed * Math.cos(rad);
+
+				    	monb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
+
+				    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Walking");
+
+
+				    } else {
+				    	// Init attack.
+				    	monb2d.SetLinearVelocity( new b2Vec2( 0 , 0 ) );
+				    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "_idle");
+				    	monb2d.m_userData[4] = monb2d.m_userData[12] ;
+				    	 
+				    }
+				} 
+			}
+		}
     }
+
+
+
+
+    get_projectile_speed( pjttype ){ 
+    	let ret = 3.5;
+    	if( pjttype == 2 ) {
+    		ret = 2.5;
+    	} else if ( pjttype == 3 ) {
+    		ret = 1.5;
+    	}	
+    	return ret;
+    }
+
+
+
+
+
+
+
 
 
     //-------
     get_monster_speed( montype ) {
+
     	let ret = 1.0;
-    	if ( montype == 1 || montype == 3 ) {
+    	if ( montype == 1 || montype == 3 || montype == 4 ) {
     		ret = 1.0;
     	} else if ( montype == 2 ) {
     		ret = 0.8;
@@ -785,10 +1041,17 @@ export class Txstage extends Entity {
     	
     	let ret = this.tilesize * 0.6;
     	if ( montype == 3 ) {
+    	
     		ret = this.tilesize * 5;
+    	
+    	} else if ( montype == 4 ) {	
+
+    		ret = this.tilesize * 4;
+
+    	
     	} else { 
     		ret = this.tilesize * 0.6;
-    	}
+    	} 
     	return ret;
     }
 
@@ -800,7 +1063,15 @@ export class Txstage extends Entity {
     		ret = 25;
     	} else if ( montype == 2 ) {
     		ret = 10;
+
+    	} else if ( montype == 4 ) {
+
+    		ret = 50;
+
+    	} else if ( montype == 12 ) {
+    		ret = 500;
     	}
+
     	return ret;
     }
 
@@ -812,9 +1083,35 @@ export class Txstage extends Entity {
     		ret = 2;
     	} else if ( montype == 2 ) {
     		ret = 1;
+    	
+    	} else if ( montype == 4 ) {
+    		ret = 5;
+
+    	} else if ( montype == 12 ) {
+    		ret = 35;
     	}
+
+    	if ( this.debugsetting == 1 ) {
+    		ret = 0;
+    	}	
+
     	return ret;
     }
+
+
+    //-------
+    get_monster_hitrate( montype ) {
+
+    	let ret = 0.5;
+    	if ( montype == 12 ) {
+    		// Boss damage is high, hitrate is low
+    		ret = 0.3;
+    	}
+    	return ret;
+
+    }
+
+
 
 
     //---
@@ -825,7 +1122,11 @@ export class Txstage extends Entity {
     		ret = 42;
     	} else if ( montype == 2 ) {
     		ret = 18;	
-    	}	
+    	
+    	} else if ( montype == 4 ) {
+    		ret = 70;
+    	}
+
     	return ret;
     }
 
@@ -1038,7 +1339,13 @@ export class Txstage extends Entity {
 						this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 * monb2d.m_userData[10] / 20; 
 					}
 				} else {
-					this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 ; 
+					if ( monb2d.m_userData[1] == 12 || monb2d.m_userData[1] == 13 ) {
+
+						let scale_y = this.render_monsters[ rendermon_i ].getComponent(Transform).scale.y;
+						this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = scale_y / 1.5 + 0.5 ; 
+					} else {
+						this.render_monsters[ rendermon_i ].getComponent(Transform).position.y = 0.5 ; 
+					}
 				}
 
 				this.update_monster( monb2d , rendermon_i );
@@ -1095,6 +1402,7 @@ export class Txstage extends Entity {
 
 				if ( renderpjt_i > -1 ) {
 
+					this.readjust_projectile_model ( pjtb2d.m_userData , renderpjt_i );
 							
 					this.render_projectiles[ renderpjt_i ]["used_by"] = pjtb2d;
 					pjtb2d.m_userData[2] = 1;
@@ -1113,12 +1421,23 @@ export class Txstage extends Entity {
 					// b2d Can be reused
 					this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.y = -999; 
 				} else {
-					this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.y = 0.5 ; 
+
+					//this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.y = pjtb2d.m_userData[6] ; 
+					this.render_projectiles[ renderpjt_i ].getComponent(Transform).position.y = pjtb2d.m_userData[6] ; 
+				
 				}
 
+				/*
+				log( "projectile", renderpjt_i ,
+					this.render_projectiles[renderpjt_i].getComponent(Transform).position.x  
+					this.render_projectiles[renderpjt_i].getComponent(Transform).position.y  
+					this.render_projectiles[renderpjt_i].getComponent(Transform).position.z  
+				) ;
+				*/
 				this.update_projectile( pjtb2d , renderpjt_i );
 			} 
 			
+
 		}
 
 
@@ -1248,7 +1567,8 @@ export class Txstage extends Entity {
 
 				if ( renderexpl_i > -1 ) {
 
-							
+					this.readjust_explosion_material ( explb2d.m_userData , renderexpl_i );
+								
 					this.render_explosions[ renderexpl_i ]["used_by"] = explb2d;
 					explb2d.m_userData[2] = 1;
 					explb2d.m_userData[3] = renderexpl_i;
@@ -1457,22 +1777,29 @@ export class Txstage extends Entity {
 					if ( this.cmd_stopmoving == 1 ) {
 						this.player_stop_moving();
 						this.cmd_stopmoving = 0;
+
+					} else if ( this.b2d_clicked != null ) {
+
+						this.playerb2d.m_userData[5].x = this.b2d_clicked.GetPosition().x;
+						this.playerb2d.m_userData[5].z = this.b2d_clicked.GetPosition().y ;
+						this.b2d_clicked = null ;
+
 					} else {
 						let transform = this.getComponent(Transform);
 						this.playerb2d.m_userData[5].x = e.hit.hitPoint.x - transform.position.x + this.vircam.x ;
 						this.playerb2d.m_userData[5].z = e.hit.hitPoint.z - transform.position.z + this.vircam.z ;
 
-						if ( this.playerb2d.m_userData[5].x < this.map_min.x * this.tilesize  ) {
-							this.playerb2d.m_userData[5].x = this.map_min.x * this.tilesize;
+						if ( this.playerb2d.m_userData[5].x < this.map_manager.map_min.x * this.tilesize  ) {
+							this.playerb2d.m_userData[5].x = this.map_manager.map_min.x * this.tilesize;
 						}
-						if ( this.playerb2d.m_userData[5].x > this.map_max.x * this.tilesize) {	
-							this.playerb2d.m_userData[5].x = this.map_max.x * this.tilesize;
+						if ( this.playerb2d.m_userData[5].x > this.map_manager.map_max.x * this.tilesize) {	
+							this.playerb2d.m_userData[5].x = this.map_manager.map_max.x * this.tilesize;
 						}
-						if ( this.playerb2d.m_userData[5].z < this.map_min.z * this.tilesize) {
-							this.playerb2d.m_userData[5].z = this.map_min.z * this.tilesize;
+						if ( this.playerb2d.m_userData[5].z < this.map_manager.map_min.z * this.tilesize) {
+							this.playerb2d.m_userData[5].z = this.map_manager.map_min.z * this.tilesize;
 						}
-						if ( this.playerb2d.m_userData[5].z > this.map_max.z * this.tilesize) {	
-							this.playerb2d.m_userData[5].z = this.map_max.z * this.tilesize;
+						if ( this.playerb2d.m_userData[5].z > this.map_manager.map_max.z * this.tilesize) {	
+							this.playerb2d.m_userData[5].z = this.map_manager.map_max.z * this.tilesize;
 						}
 					}	
 				}
@@ -1487,7 +1814,7 @@ export class Txstage extends Entity {
 			if ( this.conversing == false ) {
 				this.inv_and_stats.drink_from_inventory();
 			}
-			
+
 		}
     }
 
@@ -1648,7 +1975,7 @@ export class Txstage extends Entity {
 
 		monster.addComponent(pointer);
 		monster["pointer"] = pointer;
-		
+
 		this.addClips( monster.getComponent(Animator ) );
 		
 
@@ -1883,9 +2210,21 @@ export class Txstage extends Entity {
     	if (  pjtb2d_userdata[1] != this.render_projectiles[ renderpjt_i ]["model"] ) {
 
     		this.render_projectiles[ renderpjt_i ].removeComponent( GLTFShape );
+
     		if ( pjtb2d_userdata[1] == 1 ) {
+    			
     			this.render_projectiles[ renderpjt_i ].addComponent( resources.models.arrow );
-    		} 
+    		
+    		} else if ( pjtb2d_userdata[1] == 2 ) {
+    			
+    			this.render_projectiles[ renderpjt_i ].addComponent( resources.models.bone );
+    		
+
+    		} else if ( pjtb2d_userdata[1] == 3 ) {
+    			
+    			this.render_projectiles[ renderpjt_i ].addComponent( resources.models.fireball );
+    			
+    		}  
     		this.render_projectiles[ renderpjt_i ]["model"] = pjtb2d_userdata[1];
     	} 
 
@@ -1902,6 +2241,21 @@ export class Txstage extends Entity {
 
     }
 
+    //---------
+    readjust_explosion_material ( explb2d_userdata , renderexpl_i ) {
+
+    	if (  explb2d_userdata[1] != this.render_explosions[ renderexpl_i ]["model"] ) {
+
+    		this.render_explosions[ renderexpl_i ].removeComponent( Material );
+    		if ( explb2d_userdata[1] == 2 ) {
+    			this.render_explosions[ renderexpl_i ].addComponent( this.sharedmats[8] );
+    		} else {
+    			this.render_explosions[ renderexpl_i ].addComponent( this.sharedmats[7] );
+    		}
+    		this.render_explosions[ renderexpl_i ]["model"] = explb2d_userdata[1];
+    	}
+    }
+					
 
     //-----------
     readjust_monster_model ( monb2d_userdata , rendermon_i ) {
@@ -1919,7 +2273,29 @@ export class Txstage extends Entity {
     		
     		} else if (  monb2d_userdata[1] == 3 ) {
     			this.render_monsters[ rendermon_i ].addComponent( resources.models.goblinspear );
+			
+			} else if (  monb2d_userdata[1] == 4 ) {
+    			this.render_monsters[ rendermon_i ].addComponent( resources.models.darkwizard );
+    		    		
+
+    		} else if (  monb2d_userdata[1] == 12 ) {
+    			this.render_monsters[ rendermon_i ].addComponent( resources.models.skeleton );
+    		
+    		} else if (  monb2d_userdata[1] == 13 ) {
+    			this.render_monsters[ rendermon_i ].addComponent( resources.models.darkwizard );
+    		
+ 			}
+
+    		this.render_monsters[ rendermon_i ].getComponent( Transform ).scale = new Vector3( 0.15, 0.15, 0.15);
+
+    		if ( monb2d_userdata[1] == 12 ) {
+    			this.render_monsters[ rendermon_i ].getComponent( Transform ).scale = new Vector3( 0.5, 0.5, 0.5 );
+    		
+    		} else if ( monb2d_userdata[1] == 13 ) {
+    			this.render_monsters[ rendermon_i ].getComponent( Transform ).scale = new Vector3( 0.3, 0.3, 0.3 );
+    		
     		}
+
 
     		// Incase...
     		engine.removeEntity( this.render_monsters[ rendermon_i ] );
@@ -2050,7 +2426,8 @@ export class Txstage extends Entity {
 		animator.addClip( new AnimationState("Walking") );
 		animator.addClip( new AnimationState("Punch") );
 		animator.addClip( new AnimationState("Die") );
-   	}
+
+	}
 
 
    
@@ -2107,8 +2484,19 @@ export class Txstage extends Entity {
 		sharedmat8.transparencyMode = 1;
 		sharedmat8.emissiveIntensity = 4.5;
 		sharedmat8.emissiveColor = Color3.FromInts(252, 164, 23);
-
 		this.sharedmats.push( sharedmat8 );		
+
+
+		let sharedmat9 = new Material();
+		sharedmat9.albedoTexture = resources.textures.explosion;
+		sharedmat9.specularIntensity = 0;
+		sharedmat9.roughness = 1;
+		sharedmat9.transparencyMode = 1;
+		sharedmat9.emissiveIntensity = 4.5;
+		sharedmat9.emissiveColor = Color3.FromInts(45, 252, 23);
+			
+		this.sharedmats.push( sharedmat9 );		
+
 
 		let texture;
 		for ( texture in resources.textures ) {
@@ -2212,368 +2600,16 @@ export class Txstage extends Entity {
 
 
 
-	//---------
-	// BOOKMARK
-	init_maps() {
-
-		
-		let i, j, rnd ;
-		let half_xtilecnt = (this.xtilecnt / 2 ) >> 0;
-		let half_ztilecnt = (this.ztilecnt / 2 ) >> 0;
-
-		this.init_surfaces_road();
-		this.init_cemetery();
-		this.init_objects_house();
-		this.init_dungeon();
-
-		for ( i = this.map_min.z  ; i <= this.map_max.z  ; i++ ) {
-			for ( j = this.map_min.x  ; j <= this.map_max.x  ; j++ ) {
-
-				let inside_dungeon = 0;
-				if ( j >= 5 && j <= 40 && i>= 30 && i <=75 ) {
-					// Dungeon
-					inside_dungeon = 1;
-				}
-
-				if ( inside_dungeon == 1 ) {
-
-					if ( this.objectmaps[ j + "," + i ] == null ) {
-						rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
-						if ( rnd < 0.3 ) {
-							this.surfaces[ j + "," + i ] = [3 , 0, -1] ;
-						}
-					}
-
-				} else {
-					if ( this.surfaces[ j + "," + i ] == null && this.objectmaps[ j + "," + i ] == null  ) {
-							
-						rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
-						if ( rnd < 0.2 ) {
-							this.objectmaps[ j + "," + i ] = [ 1 , 0 , -1 ] ;
-
-							this.createStaticCircle(  
-			    				j * this.tilesize ,  
-			    				i * this.tilesize ,  
-			    				this.tilesize / 8 , 
-			    				this.world
-			    			);
-						}
-
-						
-						rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
-						if ( rnd < 0.4 ) {
-							this.surfaces[ j + "," + i ] = [1 , 0, -1] ;
-						}
-						
-
-					}
-				}
-			}
-		}
-		
-		this.init_monsters();
-		this.init_prizes() ;
-	}
-
-
-	//----
-	init_prizes() {
-
-		this.spawn_pickables( 1 , 1 , this.inv_and_stats.gen_random_armor() );
-		this.spawn_pickables( 1 , 1 , this.inv_and_stats.gen_random_weapon() );
-		this.spawn_pickables( 1 , 1 , this.inv_and_stats.gen_random_potion() );
-		
-		let coords = [ 
-			[-2,-1],
-			[-5,-4],
-			[-7,-8],
-			[ 1,-16],
-			[-6,3],
-			[-8,6],
-			[-11,3],
-			[-9,-3],
-			[-13,-4],
-			[-8,-9]
-		];
-		
-		let i;	
-		for ( i = 0 ; i < coords.length ; i++ ) {
-			let rndamt = ((Math.random() * 30) >> 0 ) + 10 ;
-			this.spawn_pickables(  coords[i][0] * this.tilesize , coords[i][1] * this.tilesize , ["item_money" , rndamt ] );
-		}
-
-						
-	}
-
-
-	//-----
-	init_surfaces_road() {
-
-		let i,j;
-
-		for ( i = -19 ; i < 10 ; i++ ) {
-										// Type, reg, rendersurface_i
-			this.surfaces[ 0 + "," + i ]   = [ 2 , 0, -1 ];
-		}
-		for ( j = -2 ; j <= 2 ; j++ ) {
-			this.surfaces[ j + "," + -10 ] = [ 2 , 0, -1 ];
-		}
-		for ( j = -2 ; j <= 2 ; j++ ) {
-			this.surfaces[ j + "," + -13 ] = [ 2 , 0, -1 ];
-		}
-
-		for ( j = 0 ; j <= 20 ; j++ ) {
-			this.surfaces[ j + "," + 10 ] = [ 2 , 0, -1 ];
-		} 
-		for ( i = 10 ; i < 30 ; i++ ) {
-			this.surfaces[ 20 + "," + i ] = [ 2 , 0, -1 ];
-		}
-
-
-		for ( j = -13 ; j <= 0 ; j++ ) {
-			this.surfaces[ j + "," + -19 ] = [ 2 , 0, -1 ];
-		}
-
-
-		
-
-	}
-
-	//----
-	init_objects_house() {
-
-		this.objectmaps["-3,-10"] 	= [ 2, 0, -1 ];
-		this.objectmaps["-3,-13"] 	= [ 2, 0, -1 ];
-		this.objectmaps["3,-10"] 	= [ 2, 0, -1 ];
-		this.objectmaps["3,-13"] 	= [ 2, 0, -1 ];
-		
-		for ( let coords in this.objectmaps ) {
-
-			let tx_tz = coords.split(",")
-			let tx = parseInt( tx_tz[0] );
-			let tz = parseInt( tx_tz[1] );
-			
-			this.createStaticBox(
-		    				tx * this.tilesize ,  
-		    				tz * this.tilesize ,  
-		    				this.tilesize ,
-		    				this.tilesize, 
-		    				this.world
-		    			);
-		}	
-	}
-
-	//---
-	init_cemetery() {
-		
-		let i,j;
-		for ( i = -21 ; i <= -17 ; i++ ) {
-			for ( j = -18; j <= -14 ; j++ ) {
-				this.surfaces[ j + "," + i ] = [ 3 , 0, -1 ];
-			}
-		}
-
-		let coords = [ 
-			[-15,-18],
-			[-15,-20],
-			[-17,-18],
-			[-17,-20]
-		];
-			
-		for ( i = 0 ; i < coords.length ; i++ ) {
-			this.objectmaps[ coords[i][0] + "," + coords[i][1] ] 	= [ 3, 0, -1 ];
-			this.createStaticBox(
-		    				coords[i][0] * this.tilesize ,  
-		    				coords[i][1] * this.tilesize ,  
-		    				this.tilesize/2 ,
-		    				this.tilesize/2, 
-		    				this.world
-		    			);
-		}
-	}
-
-
-
-
-
-	//-----------------------
-	init_monsters() {
-
-		let coords = [
-			[ 6 , 12 , 1 , 3  ],
-
-			// skele
-			[ 12 , 6 , 2 , 2  ],
-			
-			[ 22 , 3 , 1 , 3  ],
-			[ 30 , 3 , 1 , 3  ],
-			
-			[ 20 , -10 , 1 , 4  ],
-			[ 30 , -10 , 1 , 4  ],
-
-			[ 20 , -20 , 1 , 4  ],
-			[ 30 , -20 , 1 , 4  ],
-
-			[ 20 , 10 , 1 , 5  ],
-			[ 30 , 10 , 1 , 5  ],
-
-			[ 20 , 20 , 1 , 5  ],
-			[ 30 , 20 , 1 , 5  ],
-			
-			[ -20 , 0 , 1 , 5  ],
-			[ -30 , 0 , 1 , 5  ],
-			[ -20 , 10 , 1 , 5  ],
-			[ -30 , 10 , 1 , 5  ],
-			[ -20 , 20 , 1 , 5  ],
-			[ -30 , 20 , 1 , 5  ],
-
-			[ -20 , -40 , 2 , 5  ],
-			[ -30 , -40 , 2 , 5  ],
-
-			[ -34 , -23 , 2 , 5  ],
-			[  27 , -35 , 1 , 5  ],
-			[   0 ,  35 , 1 , 5  ],
-			
-			[ -20 , 20 , 1 , 5  ],
-			[ -30 , 20 , 1 , 5  ],
-
-			[ -35 , 29 , 1 , 5  ],
-
-
-			[ 18, 2 , 3,  1 ],
-											
-		]	
-
-		let i, j ;
-		for ( i = 0 ; i < coords.length ; i++ ) {
-
-			let cx = coords[i][0];
-			let cz = coords[i][1];
-			let type = coords[i][2];
-			let num_of_mons = coords[i][3];
-
-			for ( j = 0 ; j < num_of_mons ; j++ ) {
-				
-				let mx = cx + Math.random() * 0.5 - 0.25;
-				let mz = cz + Math.random() * 0.5 - 0.25;
-
-				if ( type == 1 && j >= 2 ) {
-					//Add some spear goblin to the pack
-					type = 3;
-				} 
-				this.spawn_monster( mx  * this.tilesize , mz  * this.tilesize  , type );
-			}
-		}
-
-
-	}
-
-
-	//---------------------
-	init_dungeon() {
-		let i, j ;
-
-		
-
-
-		for ( i = 30 ; i <= 75 ; i++ ) {
-			for ( j = 5 ; j <= 40 ; j++ ) {
-
-				if ( j == 20 && i >= 30 && i <= 50 ) {
-					// Narrow corridor into the cave
-
-
-				} else if ( j >= 19 &&  j <= 21 && i >= 54 && i <= 61 ) {
-					// Narrow corridor into the last room
-
-
-
-				} else if ( j >= 13 &&  j <= 13 && i >= 47 && i <= 48 ) {
-					// Narrow corridor into the left room1
-				
-				} else if ( j >= 13 &&  j <= 15 && i >= 49 && i <= 50 ) {
-					// Narrow corridor into the left room1
-					
-			
-				} else if ( j >= 7 &&  j <= 9 && i >= 41 && i <= 41 ) {
-					// Narrow corridor into the left room2
-				
-				} else if ( j >= 7 &&  j <= 8 && i >= 54 && i <= 54 ) {
-					// Narrow corridor into the left room2
-								
-
-				} else if ( j >= 6 &&  j <= 6 && i >= 41 && i <= 54 ) {
-					// Narrow corridor into the left room2
-
-
-				
-				} else if ( j >= 31 &&  j <= 34 && i >= 42 && i <= 43 ) {
-					// Narrow corridor into the right room1
-
-
-				} else if ( j >= 25 &&  j <= 25 && i >= 46 && i <= 48 ) {
-					// Narrow corridor into the right room1
-				
-				} else if ( j >= 13 &&  j <= 15 && i >= 49 && i <= 50 ) {
-					// Narrow corridor into the right room1
-				
-				
-				} else if ( j >= 31 &&  j <= 34 && i >= 42 && i <= 43 ) {
-					// Narrow corridor into the right room2
-					
-				} else if ( j >= 35 &&  j <= 36 && i >= 42 && i <= 55 ) {
-					// Narrow corridor into the right room2
-					
-
-				} else if ( j >= 11 && j <= 31 && i >= 62 && i <= 71  ) {	
-					// Last Big room
-
-				} else if ( j >= 16 && j <= 25 && i >= 49 && i <= 53  ) {	
-					// middle room
-				
-				
-
-				} else if ( j >= 10 && j <= 16 && i >= 40 && i <= 46  ) {	
-					// left room1
-
-					
-				} else if ( j >= 9 && j <= 12 && i >= 53 && i <= 56  ) {	
-					// left room2
-
-				} else if ( j >= 25 && j <= 30 && i >= 40 && i <= 45  ) {	
-					// right room1
-				} else if ( j >= 32 && j <= 36 && i >= 56 && i <= 57  ) {	
-					// right room2
-										
-
-				} else {
-
-					let wallheight = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
-
-					this.objectmaps[ j + "," + i ] 	= [ 4 , 0, -1 , wallheight ];
-					this.createStaticBox(
-			    				j * this.tilesize  ,  
-			    				i * this.tilesize  ,  
-			    				this.tilesize ,
-			    				this.tilesize, 
-			    				this.world
-			    			);
-
-				}
-
-			}
-		}
-	}
 
 
 	//-------------
-	spawn_projectile( x , z, type , dst_x, dst_z , owner_b2d ) {
+	spawn_projectile( x, y , z, type , dst_x, dst_y , dst_z , owner_b2d ) {
 
 		let projectileb2d = this.createDynamicSensorCircle( x , z , this.tilesize/4 , this.world, 1 );
 
 		// pjt  type  reg  renderpjt_i , reserve, target_xz
-		projectileb2d.m_userData = [ "pjt" ,  type , 0, -1 , 0 , new Vector3(dst_x, 0 , dst_z ),
-					0,   //6
+		projectileb2d.m_userData = [ "pjt" ,  type , 0, -1 , 0 , new Vector3(dst_x, dst_y , dst_z ),
+					y,   //6
 					0,   //7
 					0,   
 					0,
@@ -2640,6 +2676,7 @@ export class Txstage extends Entity {
 		let attackduration = 20;
 		let dmg = this.get_monster_damage( type );
 		let hp  = this.get_monster_hp( type );
+		let hitrate = this.get_monster_hitrate( type );
 
 								// m  type  reg  rendermon_i , attacking,   reserve, reseve, damage, hp, maxhp
 		monsterb2d.m_userData = [ 
@@ -2656,7 +2693,7 @@ export class Txstage extends Entity {
 								  hp,    //8.hp
 								  hp,     //9.maxhp
 								  0,     //10. dying tick
-								  0.5, 	//11. hitrate	
+								  hitrate, 	//11. hitrate	
 								  attackduration    //12. attackduration
 								 ] ;
 
