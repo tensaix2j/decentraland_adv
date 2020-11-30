@@ -8,7 +8,7 @@ export class Txmap_manager {
 	public perlin;
 
 							//    x   y    z
-	public map_min = new Vector3(-80, 0, -80);
+	public map_min = new Vector3(-80, 0, -120);
 	public map_max = new Vector3( 80, 0,  80);
 
 
@@ -41,9 +41,11 @@ export class Txmap_manager {
 
 		this.init_surfaces_road();
 		this.init_cemetery();
+		this.init_goblinvillage();
 		this.init_objects_house();
 		this.init_dungeon();
 		this.init_floors();
+
 
 		this.init_monsters();
 		this.init_prizes() ;
@@ -261,6 +263,20 @@ export class Txmap_manager {
 			this.stage.spawn_pickables(  coords[i][0] * this.stage.tilesize , coords[i][1] * this.stage.tilesize , ["item_money" , rndamt ] );
 		}
 
+
+		for ( i = 0 ; i < 5 ; i++ ) {
+			this.stage.spawn_pickables( 10 * this.stage.tilesize  + Math.random()* 0.02-0.01, 54* this.stage.tilesize + Math.random()* 0.02-0.01 , this.stage.inv_and_stats.gen_random_potion() );
+		}
+		for ( i = 0 ; i < 5 ; i++ ) {
+			this.stage.spawn_pickables( 10 * this.stage.tilesize  + Math.random()* 0.02-0.01, 54* this.stage.tilesize  + Math.random()* 0.02-0.01 , this.stage.inv_and_stats.gen_random_weapon() );
+		}
+
+		for ( i = 0 ; i < 5 ; i++ ) {
+			this.stage.spawn_pickables( 33 * this.stage.tilesize  + Math.random()* 0.02-0.01 , 57* this.stage.tilesize  + Math.random()* 0.02-0.01, this.stage.inv_and_stats.gen_random_potion() );
+		}
+		for ( i = 0 ; i < 5 ; i++ ) {
+			this.stage.spawn_pickables( 33 * this.stage.tilesize  + Math.random()* 0.02-0.01,  57 * this.stage.tilesize  + Math.random()* 0.02-0.01, this.stage.inv_and_stats.gen_random_armor() );
+		}
 						
 	}
 
@@ -325,6 +341,28 @@ export class Txmap_manager {
 		}	
 	}
 
+	//----------
+	init_goblinvillage() {
+		
+		let coords = [ 
+			[ 20,-46],
+			[ 24,-46],
+			[ 20,-50],
+			[ 24,-50]
+		];
+		let i;
+		for ( i = 0 ; i < coords.length ; i++ ) {
+			this.stage.objectmaps[ coords[i][0] + "," + coords[i][1] ] 	= [ 5, 0, -1 ];
+			this.stage.createStaticBox(
+		    				coords[i][0] * this.stage.tilesize ,  
+		    				coords[i][1] * this.stage.tilesize ,  
+		    				this.stage.tilesize/2 ,
+		    				this.stage.tilesize/2, 
+		    				this.stage.world
+		    			);
+		}
+	}
+	
 	//---
 	init_cemetery() {
 		
@@ -459,17 +497,27 @@ export class Txmap_manager {
 		//this.stage.spawn_monster(  0  * this.stage.tilesize , -63  * this.stage.tilesize  , 12 );
 
 
-		// Boss 2: Wizard master
-		this.stage.spawn_monster(  6  * this.stage.tilesize ,  -53  * this.stage.tilesize  , 13 );
+		// Boss 2: Goblin king.
+		this.stage.spawn_monster( 16  * this.stage.tilesize ,  -48  * this.stage.tilesize  , 14 );
 		
 
-		// Boss 3: Double Pekka.
-
-
-
-
-		this.stage.spawn_monster( -17  * this.stage.tilesize , -50  * this.stage.tilesize  , 4 );
+		// Boss 3: Wizard master
+		this.stage.spawn_monster(  28  * this.stage.tilesize ,  48  * this.stage.tilesize  , 13 );
 		
+
+		
+
+		// Dark wizards
+		this.stage.spawn_monster( 18  * this.stage.tilesize , 51  * this.stage.tilesize  , 4 );
+		this.stage.spawn_monster( 23  * this.stage.tilesize , 51  * this.stage.tilesize  , 4 );
+		this.stage.spawn_monster( 13  * this.stage.tilesize , 42  * this.stage.tilesize  , 4 );
+		this.stage.spawn_monster( 26  * this.stage.tilesize , 43  * this.stage.tilesize  , 4 );
+		this.stage.spawn_monster( 28  * this.stage.tilesize , 42  * this.stage.tilesize  , 4 );
+		
+		this.stage.spawn_monster( 19  * this.stage.tilesize , 28  * this.stage.tilesize  , 4 );
+		this.stage.spawn_monster( 21  * this.stage.tilesize , 28  * this.stage.tilesize  , 4 );
+			
+			
 	}
 
 

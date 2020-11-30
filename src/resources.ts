@@ -18,9 +18,10 @@ export default {
 		bone: new GLTFShape("models/bone.glb"),
 		generic_box: new BoxShape(),
 		fireball: new GLTFShape("models/fireball.glb"),
-		darkwizard: new GLTFShape("models/darkwizard.glb")
+		darkwizard: new GLTFShape("models/darkwizard.glb"),
+		goblinhut: new GLTFShape("models/goblinhut.glb")
 	},
-
+	
 
 	textures: {
 		floor: new Texture("models/floor.png"),
@@ -92,7 +93,9 @@ export default {
 		levelup: new AudioClip("sounds/levelup.mp3"),
 		goldcoin: new AudioClip("sounds/goldcoin.mp3"),
 		explosion2: new AudioClip("sounds/explosion2.mp3"),
-		ambient: new AudioClip("sounds/ambient.mp3")
+		ambient: new AudioClip("sounds/ambient.mp3"),
+		jinglebell: new AudioClip("sounds/jinglebell.mp3"),
+		bgmusic: new AudioClip("sounds/bgmusic.mp3")
 	}
 
 
