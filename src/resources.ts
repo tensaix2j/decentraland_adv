@@ -19,9 +19,11 @@ export default {
 		generic_box: new BoxShape(),
 		fireball: new GLTFShape("models/fireball.glb"),
 		darkwizard: new GLTFShape("models/darkwizard.glb"),
-		goblinhut: new GLTFShape("models/goblinhut.glb")
+		goblinhut: new GLTFShape("models/goblinhut.glb"),
+		skeleton02: new GLTFShape("models/skeleton02.glb"),
+		goblin02: new GLTFShape("models/goblin02.glb")
 	},
-	
+
 
 	textures: {
 		floor: new Texture("models/floor.png"),
@@ -60,7 +62,10 @@ export default {
 
 		uiframe: new Texture("models/uiframe.png"),
 		uiframesmall: new Texture("models/uiframesmall.png"),
-		explosion: new Texture("models/explosion.png")
+		explosion: new Texture("models/explosion.png"),
+		quest_goblineye : new Texture("models/quest_goblineye.png"),
+		quest_skeletonbone : new Texture("models/quest_skeletonbone.png")
+
 
 	},
 	sounds: {
@@ -95,7 +100,8 @@ export default {
 		explosion2: new AudioClip("sounds/explosion2.mp3"),
 		ambient: new AudioClip("sounds/ambient.mp3"),
 		jinglebell: new AudioClip("sounds/jinglebell.mp3"),
-		bgmusic: new AudioClip("sounds/bgmusic.mp3")
+		bgmusic: new AudioClip("sounds/bgmusic.mp3"),
+		dramatic: new AudioClip("sounds/dramatic.mp3")
 	}
 
 

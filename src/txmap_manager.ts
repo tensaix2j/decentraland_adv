@@ -16,7 +16,7 @@ export class Txmap_manager {
 	public snow_area_max = new Vector3( 40, 0,40);
 
 	public dungeon_area_min = new Vector3( 5, 0, 30);
-	public dungeon_area_max = new Vector3( 40,0, 75);
+	public dungeon_area_max = new Vector3( 40,0, 85);
 	
 	public d1_area_min = new Vector3( -80, 0, -30);
 	public d1_area_max = new Vector3( -40, 0,  80);
@@ -465,9 +465,53 @@ export class Txmap_manager {
 
 			[ -35 , 29 , 1 , 5  ],
 
-
 			[ 18, 2 , 3,  1 ],
-											
+			
+
+			[ -30 , -30 , 5 , 3  ],
+			[ -30 ,  -8 , 5 , 5  ],
+			[ -40 ,  -4 , 5 , 3  ],
+			[ -48 ,   5 , 5 , 5  ],
+			[ -44 ,  18 , 5 , 3  ],
+			[ -51 ,  20 , 5 , 5  ],
+			[ -60 ,   8 , 5 , 3  ],
+			[ -60 ,  -7 , 5 , 5  ],
+			[ -58 , -20 , 5,  3 ],
+			[ -58 ,  -35 , 5 , 5  ],
+			[ -56 ,  -48 , 5 , 3  ],
+			[ -47 ,  -55 , 5 , 5  ],
+			[ -38 , -48 , 5, 3 ],
+			[ -38 , -38 , 5, 5 ],
+			[ -45, -30 , 5, 3 ],
+			[ -47 , -14 , 5, 5 ],
+			[ -33 , -70 , 5, 4 ],
+			[ -26 , -64 , 5, 3 ],
+			[ -9 , -63 , 5, 3 ],	
+			[ -3 , -71 , 5 , 5 ],
+			[  10 , -71 , 5 , 4 ],
+			[ 25, -70 , 5, 4 ],
+			[ 34, -64, 5, 4 ],
+			[ 33, -53 , 5 ,3 ],
+			[ 36, -41 , 5 , 3 ],
+			[ 38, -29 , 5 , 3 ],
+			[ 42, -18 , 5 , 3 ],
+			[ 47, -2 , 5 , 3 ],
+			[ 49, 12 , 5 , 3 ],
+			[ 45, 24 , 5 , 3 ],
+			[ 49, 34 , 5 , 3 ],
+			[ 50, 46 , 5 , 3 ],
+			[ 50, 56 , 5 , 3 ],
+			[ 57, 71 , 5 , 3 ],
+			[ 65, 75 , 5 , 3 ],
+
+
+			[ -1, -45 , 2 , 3 ],
+			[ 10, -43 , 2 , 3 ],
+			
+			[ 13, -43, 6, 5 ]
+
+				
+				
 		]	
 
 		let i, j ;
@@ -502,7 +546,7 @@ export class Txmap_manager {
 		
 
 		// Boss 3: Wizard master
-		this.stage.spawn_monster(  28  * this.stage.tilesize ,  48  * this.stage.tilesize  , 13 );
+		this.stage.spawn_monster(  23  * this.stage.tilesize ,  71  * this.stage.tilesize  , 13 );
 		
 
 		
@@ -514,6 +558,7 @@ export class Txmap_manager {
 		this.stage.spawn_monster( 26  * this.stage.tilesize , 43  * this.stage.tilesize  , 4 );
 		this.stage.spawn_monster( 28  * this.stage.tilesize , 42  * this.stage.tilesize  , 4 );
 		
+		// Guard
 		this.stage.spawn_monster( 19  * this.stage.tilesize , 28  * this.stage.tilesize  , 4 );
 		this.stage.spawn_monster( 21  * this.stage.tilesize , 28  * this.stage.tilesize  , 4 );
 			

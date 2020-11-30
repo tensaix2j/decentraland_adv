@@ -49,6 +49,8 @@ export class Txinv_and_stats extends Entity {
 	public virpos_caption;
 	public stage ;
 	public tick = 0;
+	public tick_replenish_hp = 0;
+
 
 
 	constructor( stage ) {
@@ -1184,7 +1186,7 @@ export class Txinv_and_stats extends Entity {
 		let player_tile_z = ( (this.stage.playerb2d.GetPosition().y + halfz) / this.stage.tilesize ) >> 0 ;
 			
 		this.virpos_caption.value = player_tile_x + ","  + player_tile_z  ;
-		
+
 		this.tick += 1 ;
 
 	}
@@ -1327,6 +1329,11 @@ export class Txinv_and_stats extends Entity {
 					desc += attr + ": +" + item[j] + "\n";
 				}
 			}
+		} else if ( item_type_parts[0] == "quest" ) {
+
+			desc = this.capitalize( item_type_parts[1] ) + "\n";
+			desc += "This is a quest item.\nNot for sale.\n";
+			
 
 
 		} else {

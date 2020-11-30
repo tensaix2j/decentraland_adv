@@ -147,12 +147,31 @@ export class Txstage extends Entity {
        
 
         if ( this.debugsetting == 1) {
-        	let x = 0 * this.tilesize;
-        	let z = 0 * this.tilesize;
+
+        	//20,57 = last boss
+        	//-40,-40 = skele 
+        	// 6 , -40 = gob 
+        		
+        	let x =  0 * this.tilesize;
+        	let z =  0 * this.tilesize;
         	this.playerb2d.SetPosition( new b2Vec2( x,z ) );
         	this.playerb2d.m_userData[5].x =  x;
         	this.playerb2d.m_userData[5].z =  z;
         	
+        	this.inv_and_stats.player_stats["remaining_points"] = 100;
+        	this.inv_and_stats.player_stats["money"] = 100000;
+			this.inv_and_stats.player_stats["level"] = 50;
+        	        	
+
+        	for ( let i = 0 ; i < 18 ; i++ ) {
+        		this.inv_and_stats.inventories.push( ["potion_health",100] );
+        	}
+        	this.inv_and_stats.update_inventory_2d_ui();
+
+        	//this.spawn_pickables( x , z , ["quest_skeletonbone", 0 ] );
+        	//this.spawn_pickables( x , z , ["quest_goblineye", 0 ] );
+
+
 		}		
 	}	
 
@@ -210,9 +229,49 @@ export class Txstage extends Entity {
 	
 	}
 
+
+
+	//------
+	monster_boss_drop_loot( monb2d ) {
+
+		let x = monb2d.GetPosition().x;
+		let z = monb2d.GetPosition().y;
+		let pkbb2d;
+
+		if ( monb2d.m_userData[1] == 12 ) {
+
+			pkbb2d = this.spawn_pickables( x , z , ["quest_skeletonbone", 0 ] );
+			pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
+	    	
+	    	pkbb2d = this.spawn_pickables( x, z , ["item_money", 1500 ] );
+	    	pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
+	    	
+		} else if ( monb2d.m_userData[1] == 14 ) {
+
+			pkbb2d = this.spawn_pickables( x , z , ["quest_goblineye", 0 ] );
+			pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
+	    	
+	    	pkbb2d = this.spawn_pickables( x, z , ["item_money", 2500 ] );
+	    	pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
+	    
+
+	    } else if ( monb2d.m_userData[1] == 13 ) {
+
+			pkbb2d = this.spawn_pickables( x, z , ["item_money", 5000 ] );
+	    	pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
+	    	
+		} 
+
+		this.sounds["itemdrop"].playOnce() ;
+		
+
+	}
+
+
 	//------------
 	monster_drop_loot( monb2d ) {
 
+		
 		let x = monb2d.GetPosition().x;
 		let z = monb2d.GetPosition().y;
 		let rnd = Math.random();
@@ -245,7 +304,7 @@ export class Txstage extends Entity {
 			pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
         	this.sounds["itemdrop"].playOnce() ;
 		}
-
+	
 
 	}
 
@@ -338,6 +397,7 @@ export class Txstage extends Entity {
 			if ( this.is_within_distance( pkbb2d, this.playerb2d, this.tilesize * 2 ) == 1 ) {
 				
 				this.cmd_stopmoving = 1;
+				let picked_up = 0 ;
 
 				if ( pkbb2d.m_userData[4][0] == "item_money" ) {
 
@@ -349,20 +409,28 @@ export class Txstage extends Entity {
 					this.inv_and_stats.player_stats["money"] += amt ;
 					this.inv_and_stats.update_player_stats();
 					this.sounds["goldcoin"].playOnce();
+					picked_up = 1;
 					
 				} else {
-					this.inv_and_stats.inventories.push( pkbb2d.m_userData[4] );
-					this.inv_and_stats.update_inventory_2d_ui();
-					this.sounds["buttonclick"].playOnce();
-			
+					
+					if ( this.inv_and_stats.inventories.length < 20 ) {
+						this.inv_and_stats.inventories.push( pkbb2d.m_userData[4] );
+						this.inv_and_stats.update_inventory_2d_ui();
+						this.sounds["buttonclick"].playOnce();
+						picked_up = 1;
+					} else {
+						ui.displayAnnouncement("Inventory is full",  5, true, Color4.Yellow(), 14, false);
+					}
+
 				}
 			
-				let renderpkb_i = pkbb2d.m_userData[3];
-				pkbb2d.m_userData[2] = 0;
-				this.render_pickables[ renderpkb_i ]["used_by"] = null;
-				engine.removeEntity( this.render_pickables[ renderpkb_i ] );
-				this.world.DestroyBody( pkbb2d );
-				
+				if ( picked_up == 1 ) {
+					let renderpkb_i = pkbb2d.m_userData[3];
+					pkbb2d.m_userData[2] = 0;
+					this.render_pickables[ renderpkb_i ]["used_by"] = null;
+					engine.removeEntity( this.render_pickables[ renderpkb_i ] );
+					this.world.DestroyBody( pkbb2d );
+				}
 			}
 		}
 	}
@@ -706,7 +774,18 @@ export class Txstage extends Entity {
 		    	this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
 
 		    }
-		
+
+
+		    // Auto replenish life
+			if ( this.playerb2d.m_userData[20] == null ) {
+				 this.playerb2d.m_userData[20] = 0;
+			}
+			this.playerb2d.m_userData[20]+= 1;
+			if ( this.playerb2d.m_userData[20] > 30 && this.playerb2d.m_userData[8] < this.playerb2d.m_userData[9] ) {
+				this.playerb2d.m_userData[8] += 1;
+				this.playerb2d.m_userData[20] = 0;
+				this.inv_and_stats.update_player_stats();
+			}
 		}
 
 	}
@@ -715,11 +794,16 @@ export class Txstage extends Entity {
 
 	//-----
 	monster_boss_tick_change_mode( monb2d , maxtick ) {
-		// OTher bosses 
-    	monb2d.m_userData[14] += 1;
+		
+		monb2d.m_userData[14] += 1;
     	if ( monb2d.m_userData[14] > maxtick ) {
+
     		monb2d.m_userData[13] = ( monb2d.m_userData[13] + 1 ) % 4;
     		monb2d.m_userData[14] = 0;
+    	}
+
+    	if ( monb2d.m_userData[1] == 13 && monb2d.m_userData[13] == 0 ) {
+    		monb2d.m_userData[13] = 2;
     	}
 	}
 
@@ -741,13 +825,15 @@ export class Txstage extends Entity {
 			// tick 80: the moment just died.
 			if ( monb2d.m_userData[10] == 80 ) {
 
+				this.sounds["dramatic"].playOnce();
+
 				if ( monb2d.m_userData[1] == 12 ) {
 					this.sounds["skeletonhit"].playOnce();
 				} else {
 					this.sounds["organicdie"].playOnce();
 				}
 
-    			this.monster_drop_loot( monb2d );
+    			this.monster_boss_drop_loot( monb2d );
 
     			let exp = this.get_monster_experience( monb2d.m_userData[1] );
     			this.inv_and_stats.gain_exp( exp );
@@ -892,10 +978,6 @@ export class Txstage extends Entity {
 			    	monb2d.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
 			    	this.playClip(  this.render_monsters[ rendermon_i ].getComponent( Animator) , "Walking");
 
-			    	if ( monb2d.m_userData[1] == 13 && monb2d.m_userData[13] == 0 ) {
-			    		// mon13 wont use melee 	
-			    		 monb2d.m_userData[13] = 2;
-			    	}
 			    } 
 
 
@@ -1110,6 +1192,13 @@ export class Txstage extends Entity {
 
     		ret = 50;
 
+    	} else if ( montype == 5 ) {
+    		ret = 50;		
+
+    	} else if ( montype == 6 ) {
+    		ret = 60;	
+		
+
     	} else if ( montype == 12 ) {
     		ret = 200;
     	
@@ -1134,6 +1223,14 @@ export class Txstage extends Entity {
     	} else if ( montype == 4 ) {
     		ret = 5;
 
+
+    	} else if ( montype == 5 ) {
+    		ret = 5;	
+
+    	} else if ( montype == 6 ) {
+    		ret = 6;	
+		
+
     	} else if ( montype == 12 ) {
     		ret = 15;
     		
@@ -1147,7 +1244,7 @@ export class Txstage extends Entity {
 
 
     	if ( this.debugsetting == 1 ) {
-    		ret = 0;
+    	//	ret = 0;
     	}	
 
     	return ret;
@@ -1174,21 +1271,27 @@ export class Txstage extends Entity {
 
     	let ret = 50;
     	if ( montype == 1 || montype == 3 ) {
-    		ret = 42;
+    		ret = 72;
     	} else if ( montype == 2 ) {
-    		ret = 18;	
+    		ret = 48;	
     	
     	} else if ( montype == 4 ) {
-    		ret = 70;
-    	
+    		ret = 170;
+
+    	} else if ( montype == 5 ) {
+    		ret = 170;	
+
+    	} else if ( montype == 6 ) {
+    		ret = 200;	
+			
 
     	} else if ( montype == 12 ) {
-    		ret = 570;
+    		ret = 1570;
     	} else if ( montype == 13 ) {
-    		ret = 870;
+    		ret = 1870;
     	
     	} else if ( montype == 14 ) {
-    		ret = 670;
+    		ret = 1670;
     		
     	}
 
@@ -2346,6 +2449,12 @@ export class Txstage extends Entity {
 			} else if (  monb2d_userdata[1] == 4 ) {
     			this.render_monsters[ rendermon_i ].addComponent( resources.models.darkwizard );
     		    		
+    		} else if (  monb2d_userdata[1] == 5 ) {
+    			this.render_monsters[ rendermon_i ].addComponent( resources.models.skeleton02 );
+    		
+    		} else if (  monb2d_userdata[1] == 6 ) {
+    			this.render_monsters[ rendermon_i ].addComponent( resources.models.goblin02 );
+    			
 
     		} else if (  monb2d_userdata[1] == 12 ) {
     			this.render_monsters[ rendermon_i ].addComponent( resources.models.skeleton );
@@ -2364,7 +2473,7 @@ export class Txstage extends Entity {
     			this.render_monsters[ rendermon_i ].getComponent( Transform ).scale = new Vector3( 0.5, 0.5, 0.5 );
     		
     		} else if ( monb2d_userdata[1] == 13 ) {
-    			this.render_monsters[ rendermon_i ].getComponent( Transform ).scale = new Vector3( 0.3, 0.3, 0.3 );
+    			this.render_monsters[ rendermon_i ].getComponent( Transform ).scale = new Vector3( 0.5, 0.5, 0.5 );
     		
     		} else if ( monb2d_userdata[1] == 14 ) {
     			this.render_monsters[ rendermon_i ].getComponent( Transform ).scale = new Vector3( 0.4, 0.4, 0.4 );
@@ -2577,7 +2686,7 @@ export class Txstage extends Entity {
 		for ( texture in resources.textures ) {
 			
 			let texture_name_parts = texture.split("_");
-			if ( texture_name_parts[0] == "eqp" || texture_name_parts[0] == "potion" || texture_name_parts[0] == "item" ) {
+			if ( texture_name_parts[0] == "eqp" || texture_name_parts[0] == "potion" || texture_name_parts[0] == "item" || texture_name_parts[0] == "quest" ) {
 				this.shared_pickable_mats[ texture ] = new Material();
 				this.shared_pickable_mats[ texture ].albedoTexture = resources.textures[texture];
 				this.shared_pickable_mats[ texture ].specularIntensity = 0;

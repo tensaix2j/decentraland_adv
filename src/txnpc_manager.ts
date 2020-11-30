@@ -94,7 +94,7 @@ export class Txnpc_manager {
     			text: 'To move your character around, left-click on the ground.'
     		},
     		{
-    			text: 'To attack monsters, hit E on the target.)'
+    			text: 'To attack monsters, click on the target. Press E for special skill.'
     		},
     		{
     			text: 'The actual area is much larger than your viewing window can fit. When you walk around, your viewing window will pan around too.'
@@ -106,7 +106,7 @@ export class Txnpc_manager {
     			text: 'To the north is unknown territory. You might find what you are looking for there.'
     		},
     		{
-    			text: 'Last but not the least, do not take life too seriously. You will never get out of it alive.'
+    			text: 'Do not take life too seriously. You will never get out of it alive.'
     		},
 			{
 				text: 'Have a nice day.',
@@ -408,6 +408,153 @@ export class Txnpc_manager {
 		_this.render_npcs.push( myNPC4 );
 
 
+
+
+		//----
+
+
+		//-------------------------------------------------------------
+		let npc5_dialog_quest_not_done = [
+    		{
+    			text: 'You SHALL NOT PASS.',
+    		},
+    		{
+    			text: 'Before you enter the dungeon, Please make sure you are strong enough.'
+    		},
+    		{
+    			text: 'To prove that you are Strong enough, get me 2 items. The Bone of The Giant Skeleton and The Eye of the Goblin King'
+    		},
+    		{
+    			text: 'Giant Skeleton is at the cemetery of South-West (-40,-40)'
+    		},
+    		{
+    			text: 'Goblin King on the other hand is at the Goblin Village (20,-40)'
+    		},
+    		{
+				//Dialog 2
+				text: 'Alright, Get Lost now.',
+				isEndOfDialog: true,
+				triggeredByNext: () => {
+					_this.conversing = false;
+				}
+			}
+		];
+		
+		let npc5_dialog_quest_done = [
+			{
+				text: 'Wow , you impressed me.! '
+			},
+			{
+				text: 'Alright, i shall get lost then',
+				isEndOfDialog: true,
+				triggeredByNext: () => {
+
+					this.remove_questitems();
+					engine.removeEntity( myNPC5 );
+					_this.world.DestroyBody( myNPC5["b2d"] );
+					_this.conversing = false;
+					
+				}
+			}
+		]
+
+
+		let myNPC5 = new NPC(
+		    { 
+		    	position: new Vector3( 0, -999, 0),
+		    	scale: new Vector3(0.15,0.15,0.15)
+		    }, 
+		    'models/knight.glb', 
+		    () => {
+		    	// On activate 
+		    	_this.conversing = true;
+		    	if ( this.check_inventory_for_required_item() == 1 ) {
+		    		myNPC5.talk(npc5_dialog_quest_done , 0);
+		    	} else {
+		    		myNPC5.talk(npc5_dialog_quest_not_done , 0);
+		    	}
+		    },
+		    {
+				idleAnim: '_idle',
+				portrait: { path: 'models/knight_ui.png', offsetX: 40, height: 128, width: 128  },
+			    coolDownDuration: 3,
+			    hoverText: 'CHAT',
+			    onlyClickTrigger: true,
+			    continueOnWalkAway: true,
+			    onWalkAway: () => {
+				
+				},
+			}
+		)
+		myNPC5.getComponent(Transform).rotation.eulerAngles = new Vector3(0, 180, 0 );
+		myNPC5.getComponent( GLTFShape ).withCollisions = false;
+		myNPC5.setParent(_this);
+		myNPC5["virtualPosition"] = new Vector3( 20 * _this.tilesize , 0.6   , 30 * _this.tilesize );
+		let myNPC5_b2d = _this.createStaticBox(	
+			myNPC5["virtualPosition"].x,  
+			myNPC5["virtualPosition"].z,  
+			_this.tilesize ,
+			_this.tilesize ,
+			_this.world
+		);
+		myNPC5["b2d"] = myNPC5_b2d;
+		_this.render_npcs.push( myNPC5 );
+
+    }
+
+    //----
+    remove_questitems() {
+    	let i;
+    	let item_needed = {};
+    	let key;
+
+		item_needed["quest_goblineye"] = 0;
+		item_needed["quest_skeletonbone"] = 0;
+
+    	for ( i = this.stage.inv_and_stats.inventories.length - 1 ; i >= 0 ; i-- ) {
+    		let item = this.stage.inv_and_stats.inventories[i] ;
+    		for ( key in item_needed ) {
+    			if ( item[0] == key ) {
+    				this.stage.inv_and_stats.inventories.splice( i , 1 );
+    			}
+    		}
+    	}
+    	this.stage.inv_and_stats.inventory_selected_slot = -1;						
+		this.stage.inv_and_stats.update_inventory_2d_ui();
+		this.stage.inv_and_stats.update_selected_item_ui();
+
+    }
+
+    //---------
+    check_inventory_for_required_item() {
+    	
+    	let i;
+    	let item_needed = {};
+    	let key;
+
+		item_needed["quest_goblineye"] = 0;
+		item_needed["quest_skeletonbone"] = 0;
+
+		let inv_indexes = [];
+    	for ( i = 0 ; i < this.stage.inv_and_stats.inventories.length ; i++ ) {
+    		let item = this.stage.inv_and_stats.inventories[i] ;
+    		for ( key in item_needed ) {
+    			if ( item[0] == key ) {
+    				item_needed[key] = i;
+    				inv_indexes.push( i );
+    			}
+    		}
+    	}
+
+    	for ( key in item_needed ) {
+			if ( item_needed[key] == 0 ) {
+				return 0;
+			}
+		}
+		return 1;
     }
 }
+
+
+
 
