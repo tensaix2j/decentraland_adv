@@ -101,7 +101,8 @@ export default {
 		ambient: new AudioClip("sounds/ambient.mp3"),
 		jinglebell: new AudioClip("sounds/jinglebell.mp3"),
 		bgmusic: new AudioClip("sounds/bgmusic.mp3"),
-		dramatic: new AudioClip("sounds/dramatic.mp3")
+		dramatic: new AudioClip("sounds/dramatic.mp3"),
+		dash: new AudioClip("sounds/dash.mp3")
 	}
 
 

@@ -109,7 +109,7 @@ export class Txstage extends Entity {
 	public cmd_stopmoving = 0;
 	public b2d_clicked = null;
 
-	public debugsetting = 1;
+	public debugsetting = 0;
 
 
 	constructor( id, userID , transform_args , camera ) {
@@ -151,7 +151,7 @@ export class Txstage extends Entity {
         	//20,57 = last boss
         	//-40,-40 = skele 
         	// 6 , -40 = gob 
-        		
+
         	let x =  0 * this.tilesize;
         	let z =  0 * this.tilesize;
         	this.playerb2d.SetPosition( new b2Vec2( x,z ) );
@@ -478,44 +478,18 @@ export class Txstage extends Entity {
 
 
 
-	//-------------------
-	// Clicking on monster is hard, so if inaccurately click still can attack.
-	player_doattack( ) {
-		
-		
-		if ( this.playerb2d.m_userData[4] == 0 ) {
-			
-			this.playerb2d.m_userData[5].x = this.playerb2d.GetPosition().x;
-			this.playerb2d.m_userData[5].z = this.playerb2d.GetPosition().y;
-			this.playerb2d.SetLinearVelocity( new b2Vec2( 0 ,0 ) );
-			this.playerb2d.m_userData[4] = 20;
-			
-			this.find_monster_within_player();
+	//----
+	player_attack_nearby() {
 
-			let i;
-			
-			for ( i = 0 ; i < this.b2d_in_range.length ; i++ ) {
+		this.find_monster_within_player();
 
-				let monb2d = this.b2d_in_range[i];
-				if ( monb2d.m_userData[10] == 0 && this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
-
-		    		//log("Hitting ", rendermon_i );
-		    		// Player init attack.
-			    	this.playerb2d.m_userData[6] = monb2d;
-
-			    	let diffx = monb2d.GetPosition().x - this.playerb2d.GetPosition().x  ;
-					let diffz = monb2d.GetPosition().y - this.playerb2d.GetPosition().y  ;
-
-			    	let rad	 = Math.atan2( diffx, diffz );
-			    	let deg  = rad * 180.0 / Math.PI ;
-
-			    	
-			    	this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, deg , 0 );
-			    }
-		    }		
-		}
-		
-			
+		let i;
+		for ( i = 0 ; i < this.b2d_in_range.length ; i++ ) {
+			let monb2d = this.b2d_in_range[i];
+			if ( monb2d.m_userData[10] == 0 && this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
+				this.monster_gethit( monb2d , this.playerb2d );
+		    }
+	    }		
 	}
 
 
@@ -530,6 +504,10 @@ export class Txstage extends Entity {
 
 		animator.getClip("_idle").playing 		= false;
 		animator.getClip("_idle").looping 		= false;
+
+		animator.getClip("Dash").playing 		= false;
+		animator.getClip("Dash").looping 		= false
+
 		
 		animator.getClip("Walking").playing 	= false;
 		animator.getClip(clipname).playing 		= true;
@@ -747,7 +725,21 @@ export class Txstage extends Entity {
 			this.playerb2d.m_userData[4] -= 1;
 			    	
 
-		} else {
+		} else if ( this.playerb2d.m_userData[30] > 0 ) {
+			// Dashing 
+			this.playerb2d.m_userData[30] -= 1;
+	
+			if ( this.playerb2d.m_userData[30] == 15 ) {
+				this.player_attack_nearby();
+			}
+
+			if ( this.playerb2d.m_userData[30] == 1 ) {
+				this.playerb2d.m_userData[5].x = this.playerb2d.GetPosition().x ;
+				this.playerb2d.m_userData[5].z = this.playerb2d.GetPosition().y ;
+				this.playClip( this.render_players[ 0 ].getComponent(Animator) , "_idle");
+			}
+
+		} else  {
 
 			let diffx = this.playerb2d.m_userData[5].x - this.playerb2d.GetPosition().x;
 			let diffz = this.playerb2d.m_userData[5].z - this.playerb2d.GetPosition().y;
@@ -1976,7 +1968,44 @@ export class Txstage extends Entity {
 
 		} else if ( e.buttonId == 1 ) {
 			
-			this.player_doattack();
+			let rayFromCamera = this.physicsCast.getRayFromCamera(1000);
+			this.physicsCast.hitFirst(
+				rayFromCamera,
+				(e2) => {
+					
+					let transform = this.getComponent(Transform);
+					let hitx = e2.hitPoint.x - transform.position.x + this.vircam.x ;
+					let hitz = e2.hitPoint.z - transform.position.z + this.vircam.z ;
+
+					let diffx = hitx - this.playerb2d.GetPosition().x;
+					let diffz = hitz - this.playerb2d.GetPosition().y;
+					let speed = 5000;
+					
+					let rad	 = Math.atan2( diffz, diffx );
+				    let deg  = rad * 180.0 / Math.PI ;
+				    let xforce      = speed * Math.cos(rad);
+		        	let yforce      = speed * Math.sin(rad);
+
+		        	this.playerb2d.m_userData[5].x = hitx ;
+					this.playerb2d.m_userData[5].z = hitz ;
+					this.playerb2d.ApplyLinearImpulse( new b2Vec2( xforce, yforce ) , this.playerb2d.GetWorldCenter(), true );
+					this.playerb2d.m_userData[30] = 20;
+
+					this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, 90-deg , 0 );
+		    		// DAsh 
+		    		this.playClip( this.render_players[ 0 ].getComponent(Animator) , "Dash");
+		    		this.sounds["dash"].playOnce();
+
+					/*
+					let transform = this.getComponent(Transform);
+					this.playerb2d.m_userData[5].x = e2.hitPoint.x - transform.position.x + this.vircam.x ;
+					this.playerb2d.m_userData[5].z = e2.hitPoint.z - transform.position.z + this.vircam.z ;
+					*/
+				},	
+				0
+			)
+
+			
 
 		} else if ( e.buttonId == 2 ) {
 			if ( this.conversing == false ) {
@@ -2191,6 +2220,7 @@ export class Txstage extends Entity {
 		}));
 		player.addComponent( new Animator );
 		this.addClips( player.getComponent(Animator ) );
+		player.getComponent(Animator).addClip( new AnimationState("Dash") );
 
 		let clip = player.getComponent(Animator).getClip("_idle");
 		clip.playing = true;
@@ -2218,7 +2248,7 @@ export class Txstage extends Entity {
 			false 
     	);
 
-    	this.playerb2d.SetLinearDamping(10);
+    	this.playerb2d.SetLinearDamping(5);
 
 		this.playerb2d.m_userData = ["p", 
 										0, 0,0,0, 
@@ -2810,7 +2840,7 @@ export class Txstage extends Entity {
         }    
 
         //this.sounds["ambient"].playLoop();
-//        this.sounds["bgmusic"].playOnce();
+        this.sounds["bgmusic"].playOnce();
 
     }
 
@@ -2886,7 +2916,7 @@ export class Txstage extends Entity {
 	
 
 		*/
-		monsterb2d.SetLinearDamping(10);
+		monsterb2d.SetLinearDamping(5);
     		
 
 		let attackduration = 20;
