@@ -21,7 +21,8 @@ export default {
 		darkwizard: new GLTFShape("models/darkwizard.glb"),
 		goblinhut: new GLTFShape("models/goblinhut.glb"),
 		skeleton02: new GLTFShape("models/skeleton02.glb"),
-		goblin02: new GLTFShape("models/goblin02.glb")
+		goblin02: new GLTFShape("models/goblin02.glb"),
+		santa: new GLTFShape("models/santa.glb")
 	},
 
 
@@ -57,6 +58,8 @@ export default {
 		eqp_iron_boot: new Texture("models/ironboot.png"),
 
 		potion_health: new Texture("models/healthpotion.png"),
+		potion_mana  : new Texture("models/manapotion.png"),
+		
 
 		item_money: new Texture("models/itemmoney.png"),
 
@@ -64,7 +67,8 @@ export default {
 		uiframesmall: new Texture("models/uiframesmall.png"),
 		explosion: new Texture("models/explosion.png"),
 		quest_goblineye : new Texture("models/quest_goblineye.png"),
-		quest_skeletonbone : new Texture("models/quest_skeletonbone.png")
+		quest_skeletonbone : new Texture("models/quest_skeletonbone.png"),
+		quest_antidote: new Texture("models/quest_antidote.png")
 
 
 	},

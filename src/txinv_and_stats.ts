@@ -69,6 +69,9 @@ export class Txinv_and_stats extends Entity {
 
 		this.inventories.push( [ "potion_health"    , 50 ] );
 		this.inventories.push( [ "potion_health"    , 50 ] );
+		this.inventories.push( [ "potion_mana"    	, 50 ] );
+		this.inventories.push( [ "potion_mana"    	, 50 ] );
+		
 		
 
 
@@ -192,7 +195,12 @@ export class Txinv_and_stats extends Entity {
 	//----
 	gen_random_potion() {
 		
-		return ["potion_health", 50 ] 
+		let rnd = this.random_int(5);
+		if ( rnd >= 3 ) {
+			return ["potion_mana", 50 ];
+		} else {
+			return ["potion_health", 50 ];
+		}
 	}
 
 
@@ -281,7 +289,7 @@ export class Txinv_and_stats extends Entity {
 
 
 	//-----------------
-	drinkpotion() {
+	drinkpotion_hp() {
 		this.stage.playerb2d.m_userData[8] += 50;
 		if ( this.stage.playerb2d.m_userData[8] > this.stage.playerb2d.m_userData[9] ) {
 			this.stage.playerb2d.m_userData[8] = this.stage.playerb2d.m_userData[9];
@@ -290,17 +298,41 @@ export class Txinv_and_stats extends Entity {
 		this.update_player_stats();
 	}
 
+	//----
+	drinkpotion_mana() {
+		this.stage.playerb2d.m_userData[14] += 50;
+		if ( this.stage.playerb2d.m_userData[14] > this.stage.playerb2d.m_userData[15] ) {
+			this.stage.playerb2d.m_userData[14] = this.stage.playerb2d.m_userData[15];
+		}
+		this.stage.sounds["drink"].playOnce();
+		this.update_player_stats();
+	}
+
 	//----------
-	drink_from_inventory() {
+	drink_from_inventory( potion_id ) {
 		
 		let i ;
 		let hasdrank = 0;
 
 		for ( i = 0 ; i < this.inventories.length ; i++ ) {
-			if ( this.inventories[i][0] == "potion_health" ) {
+
+			if ( potion_id == 0 && this.inventories[i][0] == "potion_health" ) {
 
 				hasdrank = 1;
-				this.drinkpotion();
+				this.drinkpotion_hp();
+				this.inventory_selected_slot = -1;						
+				this.inventories.splice( i , 1 );
+				
+				this.update_inventory_2d_ui();
+				this.update_selected_item_ui();
+				this.update_player_stats();
+
+				break;
+			
+			} else if ( potion_id == 1 && this.inventories[i][0] == "potion_mana" ) {
+
+				hasdrank = 1;
+				this.drinkpotion_mana();
 				this.inventory_selected_slot = -1;						
 				this.inventories.splice( i , 1 );
 				
@@ -310,10 +342,13 @@ export class Txinv_and_stats extends Entity {
 
 				break;
 			}
+
 		}
 		if ( hasdrank == 0 ) {
 			this.stage.sounds["denied"].playOnce();
-			ui.displayAnnouncement('No HP potion in the inventory!', 5, true, Color4.Red(), 20, false);
+			let potiontype  = ["HP" , "Mana" ][ potion_id ];
+			let potioncolor = [ Color4.Red() , Color4.Blue() ][potion_id];
+			ui.displayAnnouncement('No ' + potiontype + ' potion in the inventory!', 5, true, potioncolor , 20, false);
 		}
 	}
 
@@ -336,7 +371,10 @@ export class Txinv_and_stats extends Entity {
 			if ( item_type_parts[0] == "potion" ) {
 			
 				if ( item_type_parts[1] == "health" ) {
-					this.drinkpotion();
+					this.drinkpotion_hp();
+				
+				} else if ( item_type_parts[1] == "mana" ) {
+					this.drinkpotion_mana();
 				}
 
 				this.inventories.splice( this.inventory_selected_slot , 1 );
@@ -521,6 +559,18 @@ export class Txinv_and_stats extends Entity {
 	create_ui_2d() {
 
 		let ui_2d_canvas = new UICanvas();
+
+
+		let hotkey_caption = new UIText( ui_2d_canvas );
+		hotkey_caption.value 			= "Hotkey:\nE to Dash Attack\nF to drink HP Potion from inventory\nF (Long Press) to drink Mana Potion from Inventory"
+		hotkey_caption.vAlign 			= "bottom";
+		hotkey_caption.vTextAlign 		= "top";
+		hotkey_caption.isPointerBlocker = false;
+		hotkey_caption.hAlign 			= "left";
+		hotkey_caption.positionY 		= 50;	
+		hotkey_caption.positionX 		= 50;	
+
+
 		let ui_2d_inventory = new UIImage(ui_2d_canvas, resources.textures.inventory );
 		ui_2d_inventory.vAlign = "bottom";
 		ui_2d_inventory.hAlign = "right";
@@ -537,12 +587,12 @@ export class Txinv_and_stats extends Entity {
 		}
 
 		let ui_2d_inventory_caption = new UIText( ui_2d_inventory );
-		ui_2d_inventory_caption.value = "Inventory: Click on the item to select.\nPress F to drink HP potion from inventory."
+		ui_2d_inventory_caption.value = "Inventory: Click on the item to select."
 		ui_2d_inventory_caption.vAlign = "top";
 		ui_2d_inventory_caption.vTextAlign = "top";
 		ui_2d_inventory_caption.isPointerBlocker = false;
 		ui_2d_inventory_caption.hAlign = "left";
-		ui_2d_inventory_caption.positionY = 40;	
+		ui_2d_inventory_caption.positionY = 16;	
 
 
 
@@ -1072,6 +1122,10 @@ export class Txinv_and_stats extends Entity {
 		healthbar_transform.scale.x 	=   this.stage.playerb2d.m_userData[8] * 0.95 / this.stage.playerb2d.m_userData[9] ;
 		healthbar_transform.position.x 	= ( this.stage.playerb2d.m_userData[9] - this.stage.playerb2d.m_userData[8]) * 0.95 / ( 2 * this.stage.playerb2d.m_userData[9] )
 		
+		let manabar_transform   = this.stage.render_players[ 0 ]["manabar"].getComponent( Transform );
+		manabar_transform.scale.x 		=   this.stage.playerb2d.m_userData[14] * 0.95 / this.stage.playerb2d.m_userData[15] ;
+		manabar_transform.position.x 	= ( this.stage.playerb2d.m_userData[15] - this.stage.playerb2d.m_userData[14]) * 0.95 / ( 2 * this.stage.playerb2d.m_userData[15] )
+		
 		
 		this.player_stats_caption.value = "Player Stats:\n\n";
 
@@ -1316,7 +1370,14 @@ export class Txinv_and_stats extends Entity {
 					
 			desc = "Health Potion:\n";
 			desc += cost_lbl + ": $" + item_cost + "\n";
-			desc += "Replenish 50 HP\n";
+			desc += "Replenishes 50 HP\n";
+
+		} else if ( item_type == "potion_mana" ) {
+					
+			desc = "Mana Potion:\n";
+			desc += cost_lbl + ": $" + item_cost + "\n";
+			desc += "Replenishes 50 MP\n";
+			
 			
 		} else if ( item_type_parts[0] == "eqp" ) {
 

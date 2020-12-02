@@ -449,7 +449,7 @@ export class Txnpc_manager {
 				isEndOfDialog: true,
 				triggeredByNext: () => {
 
-					this.remove_questitems();
+					this.remove_questitems(1);
 					engine.removeEntity( myNPC5 );
 					_this.world.DestroyBody( myNPC5["b2d"] );
 					_this.conversing = false;
@@ -468,7 +468,7 @@ export class Txnpc_manager {
 		    () => {
 		    	// On activate 
 		    	_this.conversing = true;
-		    	if ( this.check_inventory_for_required_item() == 1 ) {
+		    	if ( this.check_inventory_for_required_item(1) == 1 ) {
 		    		myNPC5.talk(npc5_dialog_quest_done , 0);
 		    	} else {
 		    		myNPC5.talk(npc5_dialog_quest_not_done , 0);
@@ -500,16 +500,114 @@ export class Txnpc_manager {
 		myNPC5["b2d"] = myNPC5_b2d;
 		_this.render_npcs.push( myNPC5 );
 
+    
+
+
+
+
+
+
+		let npc6_dialog_quest_not_done = [
+			{
+				text: '~~HELP~... I m poisoned... You need to kill the boss and get the Antidote.',
+				isEndOfDialog: true,
+				triggeredByNext: () => {
+					_this.conversing = false;
+				}
+			}
+		]
+
+
+		let npc6_dialog_quest_done = [
+			{
+				text: 'Yo.Thanks For Saving Me... '
+			},
+			{
+				text: 'Thats it.. '
+			},
+			{
+				text: 'Well What do you expect... Dramatic ending ? Nope..Not enough time for that shit lol.. '
+			},
+			{
+				text: 'Congrats!',
+				isEndOfDialog: true,
+				triggeredByNext: () => {
+
+					this.remove_questitems(2);
+					engine.removeEntity( myNPC6 );
+					_this.world.DestroyBody( myNPC6["b2d"] );
+					_this.conversing = false;
+
+					_this.sounds["endgame"].playOnce();
+
+					
+				}
+			}
+		]
+
+
+		let myNPC6 = new NPC(
+		    { 
+		    	position: new Vector3( 0, -999, 0),
+		    	scale: new Vector3( 0.8, 0.8, 0.8)
+		    }, 
+		    'models/santa.glb', 
+		    () => {
+		    	// On activate 
+		    	_this.conversing = true;
+		    	if ( this.check_inventory_for_required_item(2) == 1 ) {
+		    		myNPC6.talk(npc6_dialog_quest_done , 0);
+		    	} else {
+		    		myNPC6.talk(npc6_dialog_quest_not_done , 0);
+		    	}
+		    },
+		    {
+				idleAnim: '_idle',
+				portrait: { path: 'models/santa_ui.png', offsetX: 40, height: 128, width: 128  },
+			    coolDownDuration: 3,
+			    hoverText: 'CHAT',
+			    onlyClickTrigger: true,
+			    continueOnWalkAway: true,
+			    onWalkAway: () => {
+				
+				},
+			}
+		)
+		myNPC6.getComponent(Transform).rotation.eulerAngles = new Vector3(0, 180, 0 );
+		myNPC6.getComponent( GLTFShape ).withCollisions = false;
+		myNPC6.setParent(_this);
+		myNPC6["virtualPosition"] = new Vector3( 20 * _this.tilesize , 0.35   , 71 * _this.tilesize );
+		
+		myNPC6["b2d"] = _this.createStaticCircle(	
+			myNPC2["virtualPosition"].x,  
+			myNPC2["virtualPosition"].z,  
+			_this.tilesize / 8 , 
+			_this.world
+		);
+
+		_this.render_npcs.push( myNPC6 );
+
+
+
+
+
     }
 
+
+
+
     //----
-    remove_questitems() {
+    remove_questitems( quest_id ) {
     	let i;
     	let item_needed = {};
     	let key;
 
-		item_needed["quest_goblineye"] = 0;
-		item_needed["quest_skeletonbone"] = 0;
+    	if ( quest_id == 1 ) {
+			item_needed["quest_goblineye"] = 0;
+			item_needed["quest_skeletonbone"] = 0;
+		} else if ( quest_id == 2 ) {
+			item_needed["quest_antidote"] = 0;
+		}
 
     	for ( i = this.stage.inv_and_stats.inventories.length - 1 ; i >= 0 ; i-- ) {
     		let item = this.stage.inv_and_stats.inventories[i] ;
@@ -526,14 +624,19 @@ export class Txnpc_manager {
     }
 
     //---------
-    check_inventory_for_required_item() {
+    check_inventory_for_required_item( quest_id ) {
     	
     	let i;
     	let item_needed = {};
     	let key;
 
-		item_needed["quest_goblineye"] = 0;
-		item_needed["quest_skeletonbone"] = 0;
+		if ( quest_id == 1 ) {
+			item_needed["quest_goblineye"] = 0;
+			item_needed["quest_skeletonbone"] = 0;
+		} else if ( quest_id == 2 ) {
+			item_needed["quest_antidote"] = 0;
+		}
+
 
 		let inv_indexes = [];
     	for ( i = 0 ; i < this.stage.inv_and_stats.inventories.length ; i++ ) {

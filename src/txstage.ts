@@ -103,13 +103,14 @@ export class Txstage extends Entity {
 	public npc_manager;
 	public map_manager;
 
-	public mousedown = 0;
 	public physicsCast;
 
 	public cmd_stopmoving = 0;
 	public b2d_clicked = null;
 
 	public debugsetting = 0;
+	
+	public buttondown = { 0:0,1:0,2:0 };
 
 
 	constructor( id, userID , transform_args , camera ) {
@@ -138,8 +139,7 @@ export class Txstage extends Entity {
 
 
         this.npc_manager.create_npcs();
-        this.physicsCast = PhysicsCast.instance;
-		
+        	
 			
 		this.map_manager.init_maps();
         this.init_sound();
@@ -151,9 +151,10 @@ export class Txstage extends Entity {
         	//20,57 = last boss
         	//-40,-40 = skele 
         	// 6 , -40 = gob 
+        	// door 10,15
 
-        	let x =  0 * this.tilesize;
-        	let z =  0 * this.tilesize;
+        	let x =  20 * this.tilesize;
+        	let z =  57 * this.tilesize;
         	this.playerb2d.SetPosition( new b2Vec2( x,z ) );
         	this.playerb2d.m_userData[5].x =  x;
         	this.playerb2d.m_userData[5].z =  z;
@@ -170,6 +171,8 @@ export class Txstage extends Entity {
 
         	//this.spawn_pickables( x , z , ["quest_skeletonbone", 0 ] );
         	//this.spawn_pickables( x , z , ["quest_goblineye", 0 ] );
+        	this.spawn_pickables( x , z , ["quest_antidote", 0 ] );
+        		
 
 
 		}		
@@ -182,19 +185,18 @@ export class Txstage extends Entity {
 		this.world.Step( 0.05  , 10, 10 );
 
 
-		/*		
-		if ( this.mousedown == 1 ) {
+		
+		if ( this.buttondown[0] == 1 ) {
 			// Use this as mouse over
-			let rayFromCamera = this.physicsCast.getRayFromCamera(100);
-			this.physicsCast.hitFirst(
+			let rayFromCamera = PhysicsCast.instance.getRayFromCamera(100);
+			PhysicsCast.instance.hitFirst(
 				rayFromCamera,
 				(e2) => {
 					this.mouseover(e2.hitPoint.x , e2.hitPoint.z);
-				},
-				0
+				}
 			)
 		}
-		*/
+		
 		
 
 		this.update_player();
@@ -206,8 +208,10 @@ export class Txstage extends Entity {
 		this.inv_and_stats.update();
 		this.npc_manager.update();
 
-
-		
+		if ( this.buttondown[2] > 0) {
+			this.buttondown[2] += 1;
+		}
+			
 
 	}
 
@@ -256,6 +260,10 @@ export class Txstage extends Entity {
 	    
 
 	    } else if ( monb2d.m_userData[1] == 13 ) {
+
+	    	pkbb2d = this.spawn_pickables( x , z , ["quest_antidote", 0 ] );
+			pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
+	    	
 
 			pkbb2d = this.spawn_pickables( x, z , ["item_money", 5000 ] );
 	    	pkbb2d.ApplyLinearImpulse( new b2Vec2( Math.random(), Math.random() ) , pkbb2d.GetWorldCenter(), true );
@@ -452,7 +460,7 @@ export class Txstage extends Entity {
 				
 				//log( "distsqr" ,distsqr );
 		    	// p,   ,   ,  , attacking
-		    	if ( this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
+		    	if ( this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.9 ) == 1 ) {
 
 		    		//log("Hitting ", rendermon_i );
 		    		// Player init attack.
@@ -480,13 +488,14 @@ export class Txstage extends Entity {
 
 	//----
 	player_attack_nearby() {
-
+		// Dashing attack
 		this.find_monster_within_player();
 
 		let i;
 		for ( i = 0 ; i < this.b2d_in_range.length ; i++ ) {
 			let monb2d = this.b2d_in_range[i];
 			if ( monb2d.m_userData[10] == 0 && this.is_within_distance( monb2d, this.playerb2d, this.tilesize * 0.7 ) == 1 ) {
+				this.sounds["swordhit"].playOnce();
 				this.monster_gethit( monb2d , this.playerb2d );
 		    }
 	    }		
@@ -494,6 +503,7 @@ export class Txstage extends Entity {
 
 
 	//-------
+	// PLAYCLIP
 	playClip( animator , clipname ) {
 
 		animator.getClip("Punch").playing 		= false;
@@ -510,7 +520,17 @@ export class Txstage extends Entity {
 
 		
 		animator.getClip("Walking").playing 	= false;
-		animator.getClip(clipname).playing 		= true;
+		
+		
+		animator.getClip(clipname).reset();
+
+		if ( clipname == "Dash" || clipname == "Punch" ) {
+			animator.getClip(clipname).speed = 2;
+		} else {
+			animator.getClip(clipname).speed = 1;
+		}
+		animator.getClip(clipname).play();
+
 	}
 
 
@@ -719,6 +739,15 @@ export class Txstage extends Entity {
 					// Player hit monster.	
 					this.sounds["swordhit"].playOnce();
 					this.monster_gethit( monb2d , this.playerb2d );
+
+					let diffx = monb2d.GetPosition().x - this.playerb2d.GetPosition().x;
+					let diffz = monb2d.GetPosition().y - this.playerb2d.GetPosition().y;
+					let rad	 = Math.atan2( diffz, diffx );
+					let xforce      = 4 * Math.cos(rad);
+			        let yforce      = 4 * Math.sin(rad);
+			        monb2d.ApplyLinearImpulse( new b2Vec2( xforce, yforce ) , monb2d.GetWorldCenter(), true );
+						
+
 					this.playerb2d.m_userData[6] = null;
 				}
 			}
@@ -729,7 +758,7 @@ export class Txstage extends Entity {
 			// Dashing 
 			this.playerb2d.m_userData[30] -= 1;
 	
-			if ( this.playerb2d.m_userData[30] == 15 ) {
+			if ( this.playerb2d.m_userData[30] >= 15 && this.playerb2d.m_userData[30] <= 20  ) {
 				this.player_attack_nearby();
 			}
 
@@ -773,10 +802,17 @@ export class Txstage extends Entity {
 				 this.playerb2d.m_userData[20] = 0;
 			}
 			this.playerb2d.m_userData[20]+= 1;
-			if ( this.playerb2d.m_userData[20] > 30 && this.playerb2d.m_userData[8] < this.playerb2d.m_userData[9] ) {
-				this.playerb2d.m_userData[8] += 1;
-				this.playerb2d.m_userData[20] = 0;
+			if ( this.playerb2d.m_userData[20] > 30 ) {
+
+				if ( this.playerb2d.m_userData[8] < this.playerb2d.m_userData[9] ) {
+					this.playerb2d.m_userData[8] += 1;
+				}
+				if ( this.playerb2d.m_userData[14] < this.playerb2d.m_userData[15] ) {
+					this.playerb2d.m_userData[14] += (( this.playerb2d.m_userData[15] / 20 ) >> 0 ) ;
+				}
 				this.inv_and_stats.update_player_stats();
+				this.playerb2d.m_userData[20] = 0;
+				
 			}
 		}
 
@@ -1900,8 +1936,14 @@ export class Txstage extends Entity {
 	mouseover( ex, ez ) {
 
 		//log( ex, ez );
-		let transform = this.getComponent(Transform);
+		if ( this.conversing ) {
+			return ;
+		}
+		if ( this.inv_and_stats.visiting_shop > 0 ) {
+			return ;
+		}	
 
+		let transform = this.getComponent(Transform);
 		this.playerb2d.m_userData[5].x = ex - transform.position.x + this.vircam.x ;
 		this.playerb2d.m_userData[5].z = ez - transform.position.z + this.vircam.z ;
 
@@ -1909,8 +1951,19 @@ export class Txstage extends Entity {
 
 	//----
 	global_input_up(e) {
-		this.mousedown = 0;
+		
+		if ( e.buttonId == 2 ) {
 
+			log( "F held for ", this.buttondown[2] );
+
+			if ( this.buttondown[2] >= 20 ) {
+				this.inv_and_stats.drink_from_inventory(1);
+			} else {
+				this.inv_and_stats.drink_from_inventory(0);
+			}	
+		}
+		this.buttondown[e.buttonId] = 0;
+		
 	}
 
 
@@ -1921,8 +1974,6 @@ export class Txstage extends Entity {
 
 			if ( e.hit ) {
 
-				this.mousedown = 1;
-				
 				let hitEntity = engine.entities[e.hit.entityId];
 
 				if ( typeof hitEntity != "undefined"   ) {
@@ -1961,59 +2012,80 @@ export class Txstage extends Entity {
 						if ( this.playerb2d.m_userData[5].z > this.map_manager.map_max.z * this.tilesize) {	
 							this.playerb2d.m_userData[5].z = this.map_manager.map_max.z * this.tilesize;
 						}
-					}	
+					}
+
+					this.buttondown[e.buttonId] = 1;
+
+						
 				}
 				 
 			}
 
 		} else if ( e.buttonId == 1 ) {
 			
-			let rayFromCamera = this.physicsCast.getRayFromCamera(1000);
-			this.physicsCast.hitFirst(
-				rayFromCamera,
-				(e2) => {
-					
-					let transform = this.getComponent(Transform);
-					let hitx = e2.hitPoint.x - transform.position.x + this.vircam.x ;
-					let hitz = e2.hitPoint.z - transform.position.z + this.vircam.z ;
+			if ( this.conversing == false && this.playerb2d.m_userData[10] == 0 ) {
 
-					let diffx = hitx - this.playerb2d.GetPosition().x;
-					let diffz = hitz - this.playerb2d.GetPosition().y;
-					let speed = 5000;
-					
-					let rad	 = Math.atan2( diffz, diffx );
-				    let deg  = rad * 180.0 / Math.PI ;
-				    let xforce      = speed * Math.cos(rad);
-		        	let yforce      = speed * Math.sin(rad);
+				let rayFromCamera = PhysicsCast.instance.getRayFromCamera(1000);
+				PhysicsCast.instance.hitFirst(
+					rayFromCamera,
+					(e2) => {
+						
+						let manacost = 10;
+						if ( this.playerb2d.m_userData[14] - manacost  > 0 ) {
 
-		        	this.playerb2d.m_userData[5].x = hitx ;
-					this.playerb2d.m_userData[5].z = hitz ;
-					this.playerb2d.ApplyLinearImpulse( new b2Vec2( xforce, yforce ) , this.playerb2d.GetWorldCenter(), true );
-					this.playerb2d.m_userData[30] = 20;
+							this.playerb2d.m_userData[14] -= manacost;	
 
-					this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, 90-deg , 0 );
-		    		// DAsh 
-		    		this.playClip( this.render_players[ 0 ].getComponent(Animator) , "Dash");
-		    		this.sounds["dash"].playOnce();
+							let transform = this.getComponent(Transform);
+							let hitx = e2.hitPoint.x - transform.position.x + this.vircam.x ;
+							let hitz = e2.hitPoint.z - transform.position.z + this.vircam.z ;
 
-					/*
-					let transform = this.getComponent(Transform);
-					this.playerb2d.m_userData[5].x = e2.hitPoint.x - transform.position.x + this.vircam.x ;
-					this.playerb2d.m_userData[5].z = e2.hitPoint.z - transform.position.z + this.vircam.z ;
-					*/
-				},	
-				0
-			)
+							let diffx = hitx - this.playerb2d.GetPosition().x;
+							let diffz = hitz - this.playerb2d.GetPosition().y;
+							let speed = 5000;
+							
+							let rad	 = Math.atan2( diffz, diffx );
+						    let deg  = rad * 180.0 / Math.PI ;
+						    let xforce      = speed * Math.cos(rad);
+				        	let yforce      = speed * Math.sin(rad);
 
-			
+				        	this.playerb2d.m_userData[5].x = hitx ;
+							this.playerb2d.m_userData[5].z = hitz ;
+							this.playerb2d.ApplyLinearImpulse( new b2Vec2( xforce, yforce ) , this.playerb2d.GetWorldCenter(), true );
+							this.playerb2d.m_userData[30] = 20;
 
-		} else if ( e.buttonId == 2 ) {
-			if ( this.conversing == false ) {
-				this.inv_and_stats.drink_from_inventory();
+							this.render_players[ 0 ].getComponent( Transform ).rotation.eulerAngles = new Vector3( 0, 90-deg , 0 );
+				    		// DAsh 
+				    		this.playClip( this.render_players[ 0 ].getComponent(Animator) , "Dash");
+				    		this.sounds["dash"].playOnce();
+				    		this.inv_and_stats.update_player_stats();
+
+				    	} else { 
+
+				    		ui.displayAnnouncement('Not enough mana .. Wait a while to recharge', 5, true, Color4.Blue(), 20, false);
+
+				    	}
+
+						/*
+						let transform = this.getComponent(Transform);
+						this.playerb2d.m_userData[5].x = e2.hitPoint.x - transform.position.x + this.vircam.x ;
+						this.playerb2d.m_userData[5].z = e2.hitPoint.z - transform.position.z + this.vircam.z ;
+						*/
+					},	
+					0
+				)
+
 			}
 
+		} else if ( e.buttonId == 2 ) {
+			
+			if ( this.conversing == false ) {
+				this.buttondown[e.buttonId] = 1;
+			}
 		}
+
+		
     }
+
 
 
 
@@ -2275,7 +2347,7 @@ export class Txstage extends Entity {
 		healthbarbg.addComponent( this.shared_planeshape );
 		healthbarbg.addComponent( new Transform({
 			position: new Vector3(  0,   3,   0),
-			scale   : new Vector3( 1.5,   0.2,   1)
+			scale   : new Vector3( 1.5,   0.4,   1)
 		}));
 		healthbarbg.addComponent( this.shared_billboard );
 		healthbarbg.addComponent( this.sharedmats[6] );
@@ -2286,12 +2358,27 @@ export class Txstage extends Entity {
         healthbar.setParent( healthbarbg );
 		healthbar.addComponent( this.shared_planeshape );
 		healthbar.addComponent( new Transform({
-			position: new Vector3(  0,   0,   0.02),
-			scale   : new Vector3( 0.95,  0.8,   1)
+			position: new Vector3(  0,   0.2,   0.02),
+			scale   : new Vector3( 0.95,  0.4,   1)
 		}));
 		healthbar.addComponent( this.shared_billboard );
 		healthbar.addComponent( this.sharedmats[5] );
+		
+
+		let manabar = new Entity();
+        manabar.setParent( healthbarbg );
+		manabar.addComponent( this.shared_planeshape );
+		manabar.addComponent( new Transform({
+			position: new Vector3(  0,   -0.2,   0.02),
+			scale   : new Vector3( 0.95,  0.4,   1)
+		}));
+		manabar.addComponent( this.shared_billboard );
+		manabar.addComponent( this.sharedmats[9] );
+				
+
+
 		player["healthbar"] = healthbar;								 	
+		player["manabar"]   = manabar;
 
 		
 		this.render_players.push( player );
@@ -2712,6 +2799,12 @@ export class Txstage extends Entity {
 		this.sharedmats.push( sharedmat9 );		
 
 
+		let sharedmat10 = new Material();
+		sharedmat10.albedoColor = Color3.FromInts(5, 240, 240);
+		sharedmat10.specularIntensity = 0;
+		sharedmat10.roughness = 1;
+		this.sharedmats.push( sharedmat10 );	
+
 		let texture;
 		for ( texture in resources.textures ) {
 			
@@ -2758,27 +2851,15 @@ export class Txstage extends Entity {
     //-----------
     preload_models() {
     	
-    	let model_entity = new Entity();
-    	model_entity.setParent(this );
-    	model_entity.addComponent( resources.models.bone );
-    	model_entity.addComponent( new Transform({
-    		position: new Vector3(0,-999,0)
-    	}));
+    	for ( let model in resources.models ) {
+	    	let model_entity = new Entity();
+	    	model_entity.setParent(this );
+	    	model_entity.addComponent( resources.models[model] );
+	    	model_entity.addComponent( new Transform({
+	    		position: new Vector3(0,-999,0)
+	    	}));
+    	}
 
-    	model_entity = new Entity();
-    	model_entity.setParent(this );
-    	model_entity.addComponent( resources.models.fireball );
-    	model_entity.addComponent( new Transform({
-    		position: new Vector3(0,-999,0)
-    	}));
-
-    	model_entity = new Entity();
-    	model_entity.setParent(this );
-    	model_entity.addComponent( resources.models.arrow );
-    	model_entity.addComponent( new Transform({
-    		position: new Vector3(0,-999,0)
-    	}));
-    	
     }
 
 
@@ -2840,7 +2921,7 @@ export class Txstage extends Entity {
         }    
 
         //this.sounds["ambient"].playLoop();
-        this.sounds["bgmusic"].playOnce();
+        //this.sounds["bgmusic"].playOnce();
 
     }
 
@@ -2916,7 +2997,8 @@ export class Txstage extends Entity {
 	
 
 		*/
-		monsterb2d.SetLinearDamping(5);
+
+		monsterb2d.SetLinearDamping(2.5);
     		
 
 		let attackduration = 20;
@@ -3054,7 +3136,7 @@ export class Txstage extends Entity {
 		
         let fixDef          = new b2FixtureDef();
         fixDef.density      = 20;
-        fixDef.friction     = 100;
+        fixDef.friction     = 0.5;
         fixDef.restitution  = 0.3;
        
 
