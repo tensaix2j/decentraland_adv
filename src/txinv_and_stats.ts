@@ -3,6 +3,8 @@
 import resources from "src/resources";
 import { Txclickable_image } from "src/txclickable_image"
 import * as ui from '../node_modules/@dcl/ui-utils/index'
+import {Utils} from "src/utils"
+import { getUserAccount, RPCSendableMessage  } from '@decentraland/EthereumController'
 
 
 export class Txinv_and_stats extends Entity {
@@ -51,7 +53,8 @@ export class Txinv_and_stats extends Entity {
 	public tick = 0;
 	public tick_replenish_hp = 0;
 
-
+	public lblhighscore;
+	
 
 	constructor( stage ) {
 		
@@ -80,7 +83,30 @@ export class Txinv_and_stats extends Entity {
 		this.update_shop_2d_ui();
 		this.update_player_stats();
 
-					
+		
+		let highscore_backboard = new Entity();
+		highscore_backboard.setParent( this.stage )
+		highscore_backboard.addComponent( new Transform( {
+			position: new Vector3( 6.2, 5.5, -2 ),
+			scale: new Vector3( 1, 1, 1 )
+		}));
+		highscore_backboard.addComponent( new GLTFShape("models/highscore_backboard.glb") );
+
+
+		let lblhighscore = new Entity();
+		lblhighscore.setParent( this.stage );
+		lblhighscore.addComponent( new TextShape("Highscores") );
+		lblhighscore.addComponent( new Transform({
+			position:new Vector3( 6,  8,  0),
+			scale: new Vector3(0.2,0.2,0.2)
+		}) );
+
+		lblhighscore.getComponent( Transform ).rotation.eulerAngles = new Vector3(0,90,0);
+		lblhighscore.getComponent( TextShape ).hTextAlign = "left";
+        lblhighscore.getComponent( TextShape ).vTextAlign = "top";
+
+		this.lblhighscore = lblhighscore;			
+		this.displayHighscores();
 
 	}
 
@@ -520,6 +546,8 @@ export class Txinv_and_stats extends Entity {
 		this.player_stats["dex"] 		= 10;
 		this.player_stats["int"] 		= 10;
 		this.player_stats["remaining_points"] = 5;
+		this.player_stats["tick"] 		= 0;
+
 
 	}
 
@@ -1242,6 +1270,7 @@ export class Txinv_and_stats extends Entity {
 		this.virpos_caption.value = player_tile_x + ","  + player_tile_z  ;
 
 		this.tick += 1 ;
+		this.player_stats["tick"] += 1;	
 
 	}
 
@@ -1503,5 +1532,247 @@ export class Txinv_and_stats extends Entity {
 		267026144,
 		291058498
 	];
+
+
+
+	//--------
+	get_index_from_inv_by_comparing_item( item ) {
+
+		let i,j;
+		for ( i = 0 ; i < this.inventories.length ; i++ ) {
+
+			let take = 0;
+			if ( this.inventories[i].length == item.length ) {
+				take = 1;
+				for ( j = 0 ; j < item.length ; j++ ) {
+					if ( this.inventories[i][j] != item[j] ) {
+						take = 0;
+						break;
+					}
+				}
+			}
+			if ( take == 1 ) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+
+
+
+
+	//---------------------
+	async save_progress( ) {
+
+		let url = "https://tensaistudio.xyz/adv/update_playerdata.tcl";
+       
+        const myaddress = await getUserAccount()
+        log("myaddress is " , myaddress);
+
+        let username = this.stage.userID;
+        let useraddr = myaddress;
+        let playerdata_str    = JSON.stringify( {
+        	player_stats: this.player_stats,
+        	player_equipped: this.player_equipped,
+        	inventories: this.inventories
+        } );
+
+        let sig      = Utils.sha256(useraddr + "wibble" + playerdata_str );
+
+        log( playerdata_str );
+
+        
+        let fetchopt = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: "username="+ username + "&playerdata="+ playerdata_str + "&useraddr=" + useraddr+ "&sig=" + sig,
+            method: 'POST'
+        };
+        let _this = this;
+        try {
+            let resp = await fetch(url, fetchopt ).then(response => response.text())
+            log("sent request to URL", url , "SUCCESS", resp );
+            ui.displayAnnouncement('Progress Saved!', 5, true, Color4.Yellow() , 24, false);
+
+
+        } catch(err) {
+            log("error to do", url, fetchopt, err );
+        }
+   
+	}
+
+
+
+
+	//---------------------------
+	async load_progress( ) {
+
+		let url = "https://tensaistudio.xyz/adv/get_playerdata.tcl";
+       
+        const myaddress = await getUserAccount()
+        log("myaddress is " , myaddress);
+
+        let username = this.stage.userID;
+        let useraddr = myaddress;
+        
+        
+        let fetchopt = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: "username="+ username + "&useraddr=" + useraddr,
+            method: 'POST'
+        };
+        let _this = this;
+        try {
+            let resp = await fetch(url, fetchopt ).then(response => response.json())
+            let i,j,key;
+
+            if ( resp.length == 0 ) {
+            	ui.displayAnnouncement('You do not have any progress saved', 5, true, Color4.Yellow() , 24, false);
+
+			} else {
+	            for ( i = 0 ; i < resp.length ; i++ ) {
+
+	            	let playerdata = resp[i]["playerdata"];
+	            	if ( playerdata != null ) {
+
+	            		for ( key in playerdata["player_stats"] ) {
+	            			this.player_stats[key] = playerdata["player_stats"][key];
+	            		}
+	            		
+	            		this.inventories.length = 0;
+	            		for ( j = 0 ; j < playerdata["inventories"].length ; j++ ) {
+	            			this.inventories.push( playerdata["inventories"][j] );
+	            		}
+
+	            		// the ref to obj is no longer the same.
+	            		this.player_equipped.length = 0;
+	            		for ( j = 0 ; j < 6 ; j++ ) {
+	            			if ( playerdata["player_equipped"][j] != null ) {
+	            				let index_of_item_in_inventories = this.get_index_from_inv_by_comparing_item( playerdata["player_equipped"][j] );
+	            				if ( index_of_item_in_inventories > -1 ) {
+	            					let item_in_inventories = this.inventories[ index_of_item_in_inventories ];
+	            					this.player_equipped.push( item_in_inventories  );
+	            				}
+	            			}
+	            		}
+
+	            		this.inventory_selected_slot = -1;
+	            		this.update_player_stats();
+	            		this.update_inventory_2d_ui();
+						this.update_selected_item_ui();
+		
+	            		ui.displayAnnouncement('Progress Loaded', 5, true, Color4.Yellow() , 24, false);
+
+
+	            	} else {
+	            		ui.displayAnnouncement('Progress corrupted.', 5, true, Color4.Yellow() , 24, false);
+					}
+				}
+			}
+            log("sent request to URL", url , "SUCCESS", resp );
+            
+
+        } catch(err) {
+            log("error to do", url, fetchopt, err );
+        }
+	}
+
+
+
+
+	//----------
+	format_sec_to_time( seconds ) {
+
+		let hour = ( seconds / 3600 ) >> 0;
+		seconds = seconds % 3600;
+
+		let strhour = hour.toString();
+		if ( hour < 10 ) {
+			strhour = "0" + hour;
+		}
+		
+		let minute = ( seconds / 60 ) >> 0;
+		let strminute = minute.toString();
+		if ( minute < 10 ) {
+			strminute = "0" + minute;
+		}
+		seconds = seconds % 60;
+		let strsecond = seconds.toString(); 
+		if ( seconds < 10 ) {
+			strsecond = "0" + seconds;
+		}
+
+		return strhour + ":" + strminute + ":" + strsecond;
+
+	}
+
+    //----------------------
+    displayHighscores() {
+
+        let url = "https://tensaistudio.xyz/adv/get_highscore.tcl";
+        let fetchopt = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            method: 'GET'
+        };
+
+        executeTask(async () => {
+            try {
+                let resp = await fetch(url, fetchopt ).then(response => response.json())
+            
+               	log("sent request to URL", url , "SUCCESS", resp );
+                let str = "";
+                let i;
+                for ( i = 0 ; i < resp.length ; i++ ) {
+                    str += ( i + 1 ) + "." + " " + resp[i]["username"] + "     " + this.format_sec_to_time( parseInt( resp[i]["score"] ) ) + "\n";
+                }
+                this.lblhighscore.getComponent(TextShape).value = "Speed Run: Highscores\n\n"
+                this.lblhighscore.getComponent(TextShape).value += str;
+            
+
+            } catch(err) {
+                log("error to do", url, fetchopt, err );
+            }
+        });
+    }
+
+
+    //----------------------
+    async submitHighscores() {
+
+        let url = "https://tensaistudio.xyz/adv/update_highscore.tcl";
+       
+        const myaddress = await getUserAccount()
+        log("myaddress is " , myaddress);
+
+        let username = this.stage.userID;
+        let useraddr = myaddress;
+        let score    = ( this.player_stats["tick"] / 30 ) >> 0;
+        
+        let sig      = Utils.sha256(useraddr + "wibble" + score );
+
+        let fetchopt = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: "username="+ username + "&score="+ score + "&useraddr=" + useraddr+ "&sig=" + sig,
+            method: 'POST'
+        };
+        let _this = this;
+        try {
+            let resp = await fetch(url, fetchopt ).then(response => response.text())
+            log("sent request to URL", url , "SUCCESS", resp );
+            _this.displayHighscores();
+
+        } catch(err) {
+            log("error to do", url, fetchopt, err );
+        }
+   
+    }
 
 }

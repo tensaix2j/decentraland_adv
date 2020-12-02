@@ -131,7 +131,7 @@ export class Txnpc_manager {
 		    	myNPC.talk(welcomeDialog, 0);
 		    },
 		    {
-				idleAnim: 'Walking',
+				idleAnim: '_idle',
 				portrait: { path: 'models/knight_ui.png', offsetX: 40, height: 128, width: 128  },
 			    coolDownDuration: 3,
 			    hoverText: 'CHAT',
@@ -305,7 +305,7 @@ export class Txnpc_manager {
 				], 0);
 		    },
 		    {
-				idleAnim: 'Walking',
+				idleAnim: '_idle',
 				portrait: { path: 'models/wizard_ui.png', offsetX: 40, height: 128, width: 128  },
 			    coolDownDuration: 3,
 			    hoverText: 'CHAT',
@@ -539,8 +539,8 @@ export class Txnpc_manager {
 					_this.conversing = false;
 
 					_this.sounds["endgame"].playOnce();
-
-					
+					_this.inv_and_stats.submitHighscores();
+						
 				}
 			}
 		]
@@ -587,6 +587,136 @@ export class Txnpc_manager {
 
 		_this.render_npcs.push( myNPC6 );
 
+
+		//-----------------
+
+
+
+		let myNPC7 = new NPC(
+		    { 
+		    	position: new Vector3( 0, -999, 0),
+		    	scale: new Vector3(0.15,0.15,0.15)
+		    }, 
+		    'models/inmate.glb', 
+		    () => {
+		    	// On activate 
+		    	_this.conversing = true;
+		    	myNPC7.talk([
+		    		
+		    		{
+		    			text: 'I m here to take your money'
+		    		},
+
+		    		{
+		    			text: 'Sorry...I mean I am here to help you save your progress. You dont want all your efforts to go to waste upon closing the browser tab right?'
+		    		},
+
+		    		{
+						text: 'Would you like to SAVE or LOAD your progress?',
+						isQuestion: true,
+						buttons:[
+							{ 
+								label: 'SAVE',	
+								goToDialog: 3,
+							},
+							{
+								label: 'LOAD', 
+								goToDialog: 4,
+							},
+							{
+								label: 'NEITHER',
+								goToDialog: 5,
+							},
+						]
+					},
+
+					{
+						text: 'Would you like to pay 5 MATIC MANA to save your current progress? Warning: It overwrites your previous saved progress',
+						isQuestion: true,
+						buttons:[
+							{ 
+								label: 'Yes',	
+								goToDialog: 2,
+
+								triggeredActions:  () => {
+									// NPC waves goodbye
+									_this.inv_and_stats.save_progress();
+
+									_this.conversing = false;
+									myNPC7.endInteraction();
+
+								},
+							},
+							{
+								label: 'No', 
+								goToDialog: 5
+							},
+						]
+					},
+
+		    		
+		    		{
+						text: 'Would you like to pay 5 MATIC MANA to load your saved progress?',
+						isQuestion: true,
+						buttons:[
+							{ 
+								label: 'Yes',	
+								goToDialog: 2,
+
+								triggeredActions:  () => {
+									// NPC waves goodbye
+									
+									_this.inv_and_stats.load_progress();
+									_this.conversing = false;
+									myNPC7.endInteraction();
+
+								},
+							},
+							{
+								label: 'No', 
+								goToDialog: 5
+							},
+						]
+					},
+		    		
+		    		
+
+					{
+						//Dialog 2
+						text: 'K bye..',
+						isEndOfDialog: true,
+						triggeredByNext: () => {
+							_this.conversing = false;
+						}
+					}
+						
+					 
+				], 0);
+		    },
+		    {
+				idleAnim: '_idle',
+				portrait: { path: 'models/inmate_ui.png', offsetX: 40, height: 128, width: 128  },
+			    coolDownDuration: 3,
+			    hoverText: 'CHAT',
+			    onlyClickTrigger: true,
+			    continueOnWalkAway: true,
+			    onWalkAway: () => {
+				
+				},
+			}
+		)
+		myNPC7.getComponent(Transform).rotation.eulerAngles = new Vector3(0, -90, 0 );
+		myNPC7.getComponent( GLTFShape ).withCollisions = false;
+		
+		myNPC7.setParent(_this);
+		myNPC7["virtualPosition"] = new Vector3( 3 * _this.tilesize , 0.48   , -6 * _this.tilesize );
+		_this.createStaticCircle(	
+			myNPC7["virtualPosition"].x,  
+			myNPC7["virtualPosition"].z,  
+			_this.tilesize / 8 , 
+			_this.world
+		);
+		_this.render_npcs.push( myNPC7 );
 
 
 

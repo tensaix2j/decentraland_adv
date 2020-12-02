@@ -109,9 +109,8 @@ export class Txstage extends Entity {
 	public b2d_clicked = null;
 
 	public debugsetting = 0;
-	
 	public buttondown = { 0:0,1:0,2:0 };
-
+	
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -1952,6 +1951,10 @@ export class Txstage extends Entity {
 	//----
 	global_input_up(e) {
 		
+		if ( this.conversing ) {
+			return ;
+		}
+
 		if ( e.buttonId == 2 ) {
 
 			log( "F held for ", this.buttondown[2] );
@@ -1969,7 +1972,14 @@ export class Txstage extends Entity {
 
     //----
 	global_input_down(e) {
-			
+		
+		if ( this.conversing ) {
+			return ;
+		}
+		if ( this.inv_and_stats.visiting_shop > 0 ) {
+			return ;
+		}
+
 		if ( e.buttonId == 0 ) {
 
 			if ( e.hit ) {
@@ -1978,13 +1988,6 @@ export class Txstage extends Entity {
 
 				if ( typeof hitEntity != "undefined"   ) {
 					
-					if ( this.conversing ) {
-						return ;
-					}
-					if ( this.inv_and_stats.visiting_shop > 0 ) {
-						return ;
-					}
-
 					if ( this.cmd_stopmoving == 1 ) {
 						this.player_stop_moving();
 						this.cmd_stopmoving = 0;
@@ -2485,6 +2488,10 @@ export class Txstage extends Entity {
     		
     		} else if (object_type == 5 ) {
     			this.render_objects[ object_i ].addComponent( resources.models.goblinhut );
+    		
+
+    		} else if (object_type == 6 ) {
+    			this.render_objects[ object_i ].addComponent( resources.models.roadsign );
     			
     		}
 

@@ -290,11 +290,11 @@ export class Txmap_manager {
 										// Type, reg, rendersurface_i
 			this.stage.surfaces[ 0 + "," + i ]   = [ 2 , 0, -1 ];
 		}
-		for ( j = -2 ; j <= 2 ; j++ ) {
-			this.stage.surfaces[ j + "," + -10 ] = [ 2 , 0, -1 ];
+		for ( j = -3 ; j <= 3 ; j++ ) {
+			this.stage.surfaces[ j + "," + -11 ] = [ 2 , 0, -1 ];
 		}
-		for ( j = -2 ; j <= 2 ; j++ ) {
-			this.stage.surfaces[ j + "," + -13 ] = [ 2 , 0, -1 ];
+		for ( j = -3 ; j <= 3 ; j++ ) {
+			this.stage.surfaces[ j + "," + -14 ] = [ 2 , 0, -1 ];
 		}
 
 		for ( j = 0 ; j <= 20 ; j++ ) {
@@ -307,8 +307,12 @@ export class Txmap_manager {
 
 		for ( j = -13 ; j <= 0 ; j++ ) {
 			this.stage.surfaces[ j + "," + -19 ] = [ 2 , 0, -1 ];
+		
 		}
 
+		for ( j = 1 ; j <= 3 ; j++ ) {
+			this.stage.surfaces[ j + "," + -6 ] = [ 2 , 0, -1 ];
+		}
 
 		
 
@@ -322,7 +326,8 @@ export class Txmap_manager {
 			[-3,-10],
 			[-3,-13],
 			[ 3,-10],
-			[ 3,-13]
+			[ 3,-13],
+			[ 3, -5]
 		];
 
 		for ( i = 0 ; i < coords.length ; i++ ) {
@@ -338,7 +343,22 @@ export class Txmap_manager {
 		    				this.stage.tilesize, 
 		    				this.stage.world
 		    			);
+
+
+
 		}	
+
+		// roadsign
+		this.stage.objectmaps[ "2,1" ] = [ 6, 0 , -1] ;
+		this.stage.createStaticBox(
+	    				2 * this.stage.tilesize ,  
+	    				1 * this.stage.tilesize ,  
+	    				this.stage.tilesize/2 ,
+	    				this.stage.tilesize/2, 
+	    				this.stage.world
+	    			);
+
+
 	}
 
 	//----------

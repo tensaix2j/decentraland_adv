@@ -22,7 +22,11 @@ export default {
 		goblinhut: new GLTFShape("models/goblinhut.glb"),
 		skeleton02: new GLTFShape("models/skeleton02.glb"),
 		goblin02: new GLTFShape("models/goblin02.glb"),
-		santa: new GLTFShape("models/santa.glb")
+		santa: new GLTFShape("models/santa.glb"),
+
+		roadsign: new GLTFShape("models/roadsign.glb"),
+		inmate: new GLTFShape("models/inmate.glb"),
+		zombieinmate: new GLTFShape("models/zombieinmate.glb")
 	},
 
 
