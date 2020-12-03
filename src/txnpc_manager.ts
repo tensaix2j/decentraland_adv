@@ -608,7 +608,7 @@ export class Txnpc_manager {
 		    		},
 
 		    		{
-		    			text: 'Sorry...I mean I am here to help you save your progress. You dont want all your efforts to go to waste upon closing the browser tab right?'
+		    			text: 'Just kidding...I mean I am here to help you save your progress. You dont want all your efforts to go to waste upon closing the browser tab right?'
 		    		},
 
 		    		{
@@ -640,7 +640,7 @@ export class Txnpc_manager {
 
 								triggeredActions:  () => {
 									// NPC waves goodbye
-									_this.inv_and_stats.save_progress();
+									_this.inv_and_stats.pay_to_save();
 
 									_this.conversing = false;
 									myNPC7.endInteraction();
@@ -665,8 +665,8 @@ export class Txnpc_manager {
 
 								triggeredActions:  () => {
 									// NPC waves goodbye
-									
-									_this.inv_and_stats.load_progress();
+
+									_this.inv_and_stats.pay_to_load();
 									_this.conversing = false;
 									myNPC7.endInteraction();
 

@@ -5,6 +5,7 @@ import { Txclickable_image } from "src/txclickable_image"
 import * as ui from '../node_modules/@dcl/ui-utils/index'
 import {Utils} from "src/utils"
 import { getUserAccount, RPCSendableMessage  } from '@decentraland/EthereumController'
+import * as matic from '../node_modules/@dcl/l2-utils/matic/index'
 
 
 export class Txinv_and_stats extends Entity {
@@ -54,7 +55,8 @@ export class Txinv_and_stats extends Entity {
 	public tick_replenish_hp = 0;
 
 	public lblhighscore;
-	
+	public collectorWallet = '0x12cb088Bd0477b6cde164146766028131a85783c';
+
 
 	constructor( stage ) {
 		
@@ -1560,7 +1562,35 @@ export class Txinv_and_stats extends Entity {
 
 
 
+	//-----------------
+	async pay_to_save() {
 
+		ui.displayAnnouncement('Waiting for Transaction to complete....', 5, true, Color4.Yellow() , 24, false);
+
+		try {
+			let receipt = await matic.sendMana( this.collectorWallet, 1 , true).then();
+			this.save_progress();
+
+		} catch( e ) {
+
+			ui.displayAnnouncement('Transaction Failed: ' + e["data"]["message"], 5, true, Color4.Yellow() , 24, false);
+
+		}
+	}
+
+	//----------
+	async pay_to_load() {
+
+		ui.displayAnnouncement('Waiting for Transaction to complete....', 5, true, Color4.Yellow() , 24, false);
+		try {
+			let receipt = await matic.sendMana( this.collectorWallet, 1 , true).then();
+			this.load_progress();
+			
+		} catch( e ) {
+			ui.displayAnnouncement('Transaction Failed: ' + e["data"]["message"], 5, true, Color4.Yellow() , 24, false);
+
+		}
+	}
 
 	//---------------------
 	async save_progress( ) {
