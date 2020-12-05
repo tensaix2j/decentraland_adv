@@ -90,6 +90,22 @@ export class Txmap_manager {
 			    			);
 						}
 
+
+						if ( rnd < 0.25 && this.stage.objectmaps[ j + "," + i ] == null ) {
+
+							// snowman
+							this.stage.objectmaps[ j + "," + i ] = [ 7 , 0 , -1 ,  ( (Math.random() * 360 ) >> 0 ) ] ;
+
+							this.stage.createStaticCircle(  
+			    				j * this.stage.tilesize ,  
+			    				i * this.stage.tilesize ,  
+			    				this.stage.tilesize / 8 , 
+			    				this.stage.world
+			    			);
+						}
+
+
+
 						rnd = ( this.perlin.simplex2( j , i )  + 1 ) * 0.5;
 						if ( rnd < 0.4 ) {
 							// snows
@@ -358,6 +374,11 @@ export class Txmap_manager {
 	    				this.stage.world
 	    			);
 
+
+	}
+
+	//----
+	init_decorations() {
 
 	}
 

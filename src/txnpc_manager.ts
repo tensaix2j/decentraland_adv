@@ -636,14 +636,17 @@ export class Txnpc_manager {
 						buttons:[
 							{ 
 								label: 'Yes',	
-								goToDialog: 2,
+								goToDialog: 5,
 
 								triggeredActions:  () => {
 									// NPC waves goodbye
+									myNPC7.endInteraction();
+									_this.conversing = false;
+									
 									_this.inv_and_stats.pay_to_save();
 
-									_this.conversing = false;
-									myNPC7.endInteraction();
+									log("npc7 Done");
+									
 
 								},
 							},
@@ -661,15 +664,17 @@ export class Txnpc_manager {
 						buttons:[
 							{ 
 								label: 'Yes',	
-								goToDialog: 2,
+								goToDialog: 5,
 
 								triggeredActions:  () => {
 									// NPC waves goodbye
-
-									_this.inv_and_stats.pay_to_load();
 									_this.conversing = false;
 									myNPC7.endInteraction();
 
+									_this.inv_and_stats.pay_to_load();
+									log("npc7 Done");
+
+									
 								},
 							},
 							{

@@ -1565,10 +1565,12 @@ export class Txinv_and_stats extends Entity {
 	//-----------------
 	async pay_to_save() {
 
+		log("pay_to_save");
+
 		ui.displayAnnouncement('Waiting for Transaction to complete....', 5, true, Color4.Yellow() , 24, false);
 
 		try {
-			let receipt = await matic.sendMana( this.collectorWallet, 1 , true).then();
+			let receipt = await matic.sendMana( this.collectorWallet, 5 , true).then();
 			this.save_progress();
 
 		} catch( e ) {
@@ -1581,9 +1583,11 @@ export class Txinv_and_stats extends Entity {
 	//----------
 	async pay_to_load() {
 
+		log("pay_to_load");
+		
 		ui.displayAnnouncement('Waiting for Transaction to complete....', 5, true, Color4.Yellow() , 24, false);
 		try {
-			let receipt = await matic.sendMana( this.collectorWallet, 1 , true).then();
+			let receipt = await matic.sendMana( this.collectorWallet, 5 , true).then();
 			this.load_progress();
 			
 		} catch( e ) {

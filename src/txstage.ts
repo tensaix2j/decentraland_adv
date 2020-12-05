@@ -1918,6 +1918,14 @@ export class Txstage extends Entity {
 						this.render_objects[ object_i ].getComponent(Transform).position.x = x; 
 						this.render_objects[ object_i ].getComponent(Transform).position.z = z; 
 						this.render_objects[ object_i ].getComponent(Transform).position.y = halftilesize + 0.01 ; 
+
+						if ( this.objectmaps[ j + "," + i ][3] != null ) {
+							let rot = this.objectmaps[ j + "," + i ][3];
+							this.render_objects[ object_i ].getComponent(Transform).rotation.eulerAngles = new Vector3(0,rot,0); 
+						} else {
+							this.render_objects[ object_i ].getComponent(Transform).rotation.eulerAngles = new Vector3(0,0,0); 
+						}
+
 					}
 				}
 
@@ -2492,6 +2500,9 @@ export class Txstage extends Entity {
 
     		} else if (object_type == 6 ) {
     			this.render_objects[ object_i ].addComponent( resources.models.roadsign );
+    		
+    		} else if (object_type == 7 ) {
+    			this.render_objects[ object_i ].addComponent( resources.models.snowman );
     			
     		}
 
@@ -2636,6 +2647,13 @@ export class Txstage extends Entity {
 
     //---
     create_floors() {
+
+    	let stage = new Entity();
+    	stage.setParent(this);
+    	stage.addComponent( new GLTFShape("models/snowlayer.glb"));
+    	stage.addComponent( new Transform({
+    		position:new Vector3(0, -0.25  ,0)
+    	}));
 
 		let floor = new Entity();
 		floor.setParent(this);
@@ -2929,6 +2947,7 @@ export class Txstage extends Entity {
 
         //this.sounds["ambient"].playLoop();
         //this.sounds["bgmusic"].playOnce();
+        this.sounds["jinglebell"].playOnce();
 
     }
 

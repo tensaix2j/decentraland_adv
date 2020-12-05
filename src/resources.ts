@@ -26,7 +26,8 @@ export default {
 
 		roadsign: new GLTFShape("models/roadsign.glb"),
 		inmate: new GLTFShape("models/inmate.glb"),
-		zombieinmate: new GLTFShape("models/zombieinmate.glb")
+
+		snowman: new GLTFShape("models/snowman.glb")
 	},
 
 
@@ -108,7 +109,6 @@ export default {
 		explosion2: new AudioClip("sounds/explosion2.mp3"),
 		ambient: new AudioClip("sounds/ambient.mp3"),
 		jinglebell: new AudioClip("sounds/jinglebell.mp3"),
-		bgmusic: new AudioClip("sounds/bgmusic.mp3"),
 		dramatic: new AudioClip("sounds/dramatic.mp3"),
 		dash: new AudioClip("sounds/dash.mp3")
 	}
