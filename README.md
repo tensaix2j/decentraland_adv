@@ -2,7 +2,7 @@ This is a game created for Decentraland Game Jam 2020 December (Theme: Saving XM
 
 ## Slashmas Warrior
 
-![screenshot](https://github.com/tensaix2j/decentraland_cr/blob/master/screenshot/slashmas_ss_01.png)
+![screenshot](https://github.com/tensaix2j/decentraland_adv/blob/master/screenshot/slashmas_ss_01.png)
 
 DEMO:
 https://play.decentraland.org/?position=-55%2C-34
