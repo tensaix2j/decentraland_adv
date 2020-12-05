@@ -1,18 +1,18 @@
 {
   "display": {
-    "title": "Hello",
+    "title": "Slashmas Warrior",
     "favicon": "favicon_asset"
   },
   "contact": {
     "name": "tensaix2j",
     "email": "tensaix2j@gmail.com"
   },
-  "owner": "",
+  "owner": "tensaix2j",
   "scene": {
     "parcels": [
-      "0,0"
+      "-55,-34"
     ],
-    "base": "0,0"
+    "base": "-55,-34"
   },
   "communications": {
     "type": "webrtc",
